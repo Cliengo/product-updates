@@ -1,5 +1,7 @@
 import 'dotenv/config'
 import path from 'path'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../../app/generated/prisma/client'
 
 function resolveDbUrl(): string {
@@ -14,11 +16,9 @@ function resolveDbUrl(): string {
 function createPrismaClient(): PrismaClient {
   const url = resolveDbUrl()
   if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
-    const { PrismaPg } = require('@prisma/adapter-pg')
     const adapter = new PrismaPg({ connectionString: url })
     return new PrismaClient({ adapter })
   }
-  const { PrismaLibSql } = require('@prisma/adapter-libsql')
   const adapter = new PrismaLibSql({ url })
   return new PrismaClient({ adapter })
 }
