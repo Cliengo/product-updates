@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getFeatures, type FeatureFilters } from '@/lib/db/repository'
+import { getFeatures, type FeatureFilters as FilterParams } from '@/lib/db/repository'
 import FeatureCard from '@/components/FeatureCard'
 import FeatureFilters from '@/components/FeatureFilters'
 
@@ -15,7 +15,7 @@ interface PageProps {
 
 export default async function LandingPage({ searchParams }: PageProps) {
   const params = await searchParams
-  const filters: FeatureFilters = {
+  const filters: FilterParams = {
     estado: params.estado,
     producto: params.producto,
     priority: params.priority,
