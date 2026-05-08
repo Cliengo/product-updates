@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Feature {
+  id                   String    @id
+  issueNumber          Int
+  issueUrl             String
+  repo                 String
+
+  producto             String?
+  priority             String?
+  type                 String?
+  milestone            String?
+  milestoneDate        DateTime?
+  githubStatus         String?
+
+  tituloAmigable       String
+  descripcionCliente   String?
+  featureFlag          String?
+  estadoDisponibilidad String
+  planMinimo           String?
+  aQuienAplica         String?
+  mensajeSugerido      String?
+  screenshotsUrl       String?
+  videoUrl             String?
+  onePagerUrl          String?
+  faq                  String?
+  notasInternas        String?
+
+  rawComment           String?
+  parseErrors          String?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  syncedAt             DateTime  @default(now())
+}

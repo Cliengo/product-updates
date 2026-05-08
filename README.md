@@ -1,36 +1,149 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Product Updates — Cliengo (interno)
 
-## Getting Started
+Landing interna para equipos cara a cliente (Marketing, Ventas, CS, Ops) que centraliza features lanzados, su estado real, y el material para comunicarlos al cliente.
 
-First, run the development server:
+---
+
+## Cómo correr localmente
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run sync:mock   # carga 12 features de ejemplo en SQLite
+npm run dev         # inicia en http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+No necesitás ninguna credencial ni variable de entorno adicional para el modo mock.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Arquitectura
 
-## Learn More
+```
+product-updates/
+├── app/
+│   ├── page.tsx                  ← Landing (server component)
+│   ├── features/[id]/page.tsx    ← Detalle (server component)
+│   └── api/sync/route.ts         ← Endpoint del cron
+├── components/                   ← UI components
+├── lib/
+│   ├── types.ts                  ← Tipos compartidos
+│   ├── db/
+│   │   ├── prisma.ts             ← Singleton de Prisma
+│   │   └── repository.ts         ← Queries a la DB
+│   └── sync/
+│       ├── index.ts              ← Orchestrador del sync
+│       ├── sources/
+│       │   ├── mock.ts           ← Lee data/mock-features.json
+│       │   └── github.ts         ← Lee GitHub Projects v2 (GraphQL)
+│       └── parsers/
+│           └── comment.ts        ← Parsea el comentario estructurado
+├── data/
+│   └── mock-features.json        ← 12 features de ejemplo
+├── prisma/
+│   └── schema.prisma             ← Modelo Feature (SQLite local)
+└── proxy.ts                      ← Auth stub (Next.js 16)
+```
 
-To learn more about Next.js, take a look at the following resources:
+**Para reemplazar el mock por las APIs reales** solo necesitás tocar 2 archivos:
+- `lib/sync/sources/github.ts` — ya implementado, necesita las variables de entorno
+- `.env` — cambiar `DATA_SOURCE=github` y agregar las credenciales de GitHub
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Variables de entorno
 
-## Deploy on Vercel
+Copiá `.env.example` como `.env.local` (producción) o editá `.env` (local):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Descripción |
+|---|---|
+| `DATABASE_URL` | SQLite local: `file:./dev.db`. Postgres (Neon): connection string completo |
+| `DATA_SOURCE` | `mock` (default) o `github` |
+| `SYNC_SECRET_TOKEN` | Token para proteger `POST /api/sync` |
+| `GITHUB_TOKEN` | PAT con permisos `read:project`, `read:org` |
+| `GITHUB_PROJECT_ID_ROADMAP` | ID del Project v2 del repo Roadmap |
+| `GITHUB_PROJECT_ID_RAP` | ID del Project v2 del repo RAP |
+| `BYPASS_AUTH` | `true` para saltar auth en desarrollo |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Cómo obtener los IDs de GitHub Projects v2
+
+Ejecutá esta query en el [explorador GraphQL de GitHub](https://github.com/graphql) con tu token:
+
+```graphql
+query {
+  organization(login: "cliengo") {
+    projectsV2(first: 20) {
+      nodes {
+        id
+        title
+      }
+    }
+  }
+}
+```
+
+Los IDs tienen el formato `PVT_kwXXXXXXXXXX`.
+
+---
+
+## Sync
+
+El sync lee de GitHub (o mock), filtra issues con Status = "IN PROD" que tengan el comentario `## 📣 Product Update`, y hace upsert en la DB.
+
+**Correr manualmente:**
+```bash
+npm run sync:mock          # mock, sin credenciales
+DATA_SOURCE=github npx tsx scripts/sync-mock.ts  # GitHub real
+```
+
+**Cron automático (GitHub Actions) — crear `.github/workflows/sync.yml`:**
+```yaml
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        run: |
+          curl -X POST https://tu-app.vercel.app/api/sync \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}"
+```
+
+---
+
+## Deploy en Vercel + Neon
+
+### 1. Base de datos (Neon)
+1. Crear proyecto en [neon.tech](https://neon.tech) (free tier)
+2. Copiar el connection string
+
+### 2. Migrar schema a PostgreSQL
+Una línea en `prisma/schema.prisma`:
+```diff
+datasource db {
+-  provider = "sqlite"
++  provider = "postgresql"
+}
+```
+Luego: `npx prisma migrate deploy`
+
+### 3. Vercel
+1. Conectar el repo en [vercel.com](https://vercel.com)
+2. Agregar las variables de entorno del `.env.example`
+3. Deploy automático en cada push a `main`
+
+### 4. GitHub Actions
+Agregar `SYNC_SECRET_TOKEN` como secret en el repo y crear el workflow de arriba.
+
+---
+
+## Fase 2: LaunchDarkly (pendiente)
+
+Cuando se sume LaunchDarkly real, los únicos cambios son:
+- `lib/sync/sources/github.ts`: después de obtener `featureFlag` del comentario, consultar la API de LaunchDarkly para obtener estado real y % rollout
+- `lib/types.ts`: agregar campos opcionales `flagEnabled`, `flagRolloutPercentage`
+
+El resto de la UI y la DB no cambian.
