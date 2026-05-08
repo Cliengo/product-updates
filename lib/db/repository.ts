@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import type { Prisma } from '../../app/generated/prisma/client'
 import type { FeatureData, FaqItem, EstadoDisponibilidad } from '@/lib/types'
 
 function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>): FeatureData {
@@ -24,7 +25,7 @@ export interface FeatureFilters {
 }
 
 export async function getFeatures(filters: FeatureFilters): Promise<FeatureData[]> {
-  const where: Parameters<typeof prisma.feature.findMany>[0]['where'] = {}
+  const where: Prisma.FeatureWhereInput = {}
 
   if (filters.estado) where.estadoDisponibilidad = filters.estado
   if (filters.producto) where.producto = filters.producto
