@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import type { FeatureData, FaqItem } from '@/lib/types'
+import type { FeatureData, FaqItem, EstadoDisponibilidad } from '@/lib/types'
 
 function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>): FeatureData {
   if (!raw) throw new Error('Feature not found')
@@ -9,6 +9,7 @@ function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>):
     createdAt: raw.createdAt.toISOString(),
     updatedAt: raw.updatedAt.toISOString(),
     syncedAt: raw.syncedAt.toISOString(),
+    estadoDisponibilidad: raw.estadoDisponibilidad as EstadoDisponibilidad,
     faq: raw.faq ? (JSON.parse(raw.faq) as FaqItem[]) : [],
     parseErrors: raw.parseErrors ? (JSON.parse(raw.parseErrors) as string[]) : [],
   }
