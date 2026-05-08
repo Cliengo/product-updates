@@ -1,9 +1,7 @@
 import 'dotenv/config'
 import path from 'path'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
 import { PrismaClient } from '../../app/generated/prisma/client'
 
-// libSQL needs an absolute path for local SQLite files
 function resolveDbUrl(): string {
   const url = process.env.DATABASE_URL ?? 'file:./dev.db'
   if (url.startsWith('file:') && !url.startsWith('file:///') && !url.startsWith('file://')) {
@@ -14,7 +12,14 @@ function resolveDbUrl(): string {
 }
 
 function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaLibSql({ url: resolveDbUrl() })
+  const url = resolveDbUrl()
+  if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
+    const { PrismaPg } = require('@prisma/adapter-pg')
+    const adapter = new PrismaPg({ connectionString: url })
+    return new PrismaClient({ adapter })
+  }
+  const { PrismaLibSql } = require('@prisma/adapter-libsql')
+  const adapter = new PrismaLibSql({ url })
   return new PrismaClient({ adapter })
 }
 

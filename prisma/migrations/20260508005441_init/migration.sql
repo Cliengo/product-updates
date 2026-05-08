@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "Feature" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "issueNumber" INTEGER NOT NULL,
     "issueUrl" TEXT NOT NULL,
     "repo" TEXT NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE "Feature" (
     "priority" TEXT,
     "type" TEXT,
     "milestone" TEXT,
-    "milestoneDate" DATETIME,
+    "milestoneDate" TIMESTAMP(3),
     "githubStatus" TEXT,
     "tituloAmigable" TEXT NOT NULL,
     "descripcionCliente" TEXT,
@@ -24,7 +24,9 @@ CREATE TABLE "Feature" (
     "notasInternas" TEXT,
     "rawComment" TEXT,
     "parseErrors" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "syncedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "syncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Feature_pkey" PRIMARY KEY ("id")
 );
