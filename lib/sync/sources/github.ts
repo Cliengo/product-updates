@@ -2,6 +2,24 @@ import type { FeatureData } from '@/lib/types'
 import type { DataSource } from './mock'
 import { parseComment } from '../parsers/comment'
 
+interface ProjectItemsResponse {
+  node: {
+    items: {
+      pageInfo: { hasNextPage: boolean; endCursor: string }
+      nodes: {
+        fieldValues: { nodes: { name?: string; text?: string; date?: string; field?: { name: string } }[] }
+        content: {
+          id?: string
+          number?: number
+          url?: string
+          comments: { nodes: { body: string }[] }
+          milestone?: { title: string; dueOn?: string }
+        } | null
+      }[]
+    }
+  }
+}
+
 export class GitHubDataSource implements DataSource {
   private token: string
   private org: string
@@ -90,13 +108,13 @@ export class GitHubDataSource implements DataSource {
     let cursor: string | null = null
 
     do {
-      const data = await this.graphql<{ node: { items: { pageInfo: { hasNextPage: boolean; endCursor: string }; nodes: unknown[] } } }>(
+      const data = await this.graphql<ProjectItemsResponse>(
         QUERY,
         { projectId, cursor }
       )
       const { nodes, pageInfo } = data.node.items
 
-      for (const item of nodes as { fieldValues: { nodes: { name?: string; text?: string; date?: string; field?: { name: string } }[] }; content: { id?: string; number?: number; url?: string; comments: { nodes: { body: string }[] }; milestone?: { title: string; dueOn?: string } } | null }[]) {
+      for (const item of nodes) {
         const issue = item.content
         if (!issue?.id) continue
 
