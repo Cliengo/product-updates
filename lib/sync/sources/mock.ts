@@ -7,6 +7,6 @@ export interface DataSource {
 
 export class MockDataSource implements DataSource {
   async getFeatures(): Promise<FeatureData[]> {
-    return mockData as FeatureData[]
+    return mockData as unknown as FeatureData[]
   }
 }
