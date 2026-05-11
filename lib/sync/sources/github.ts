@@ -108,7 +108,7 @@ export class GitHubDataSource implements DataSource {
     let cursor: string | null = null
 
     do {
-      const data = await this.graphql<ProjectItemsResponse>(
+      const data: ProjectItemsResponse = await this.graphql<ProjectItemsResponse>(
         QUERY,
         { projectId, cursor }
       )
