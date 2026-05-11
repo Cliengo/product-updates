@@ -1,0 +1,16 @@
+name: Sync Product Updates
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # cada hora
+  workflow_dispatch:       # permite correrlo manualmente desde GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync endpoint
+        run: |
+          curl -s -f -X POST ${{ secrets.APP_URL }}/api/sync \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}" \
+            -H "Content-Type: application/json"
