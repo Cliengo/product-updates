@@ -127,7 +127,7 @@ export class GitHubDataSource implements DataSource {
         }
 
         // Only process IN PROD items
-        if (fields['Status'] !== 'In Prod') continue
+        if (fields['Status']?.toUpperCase() !== 'IN PROD') continue
 
         const updateComment = [...issue.comments.nodes]
           .reverse()
