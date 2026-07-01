@@ -1,6 +1,15 @@
 import type { FeatureData } from '@/lib/types'
 import type { DataSource } from './mock'
 import { parseComment } from '../parsers/comment'
+import { generateProductUpdate } from '../groq'
+import { buildTemplateComment, PRODUCT_UPDATE_HEADER } from '../template'
+
+/**
+ * Campo single-select del Project. Todo lo que llega a IN PROD se publica;
+ * el equipo marca "No comunicar = Sí" en el board (antes de IN PROD) para excluir.
+ */
+const EXCLUDE_FIELD = 'No comunicar'
+const EXCLUDE_VALUE = 'Sí'
 
 interface ProjectItemsResponse {
   node: {
@@ -12,6 +21,8 @@ interface ProjectItemsResponse {
           id?: string
           number?: number
           url?: string
+          title?: string
+          body?: string
           comments: { nodes: { body: string }[] }
           milestone?: { title: string; dueOn?: string }
         } | null
@@ -35,6 +46,31 @@ export class GitHubDataSource implements DataSource {
       this.fetchFromProject('rap'),
     ])
     return [...roadmap, ...rap]
+  }
+
+  /** Postea un comentario en un issue vía la REST API. Requiere token con issues:write. */
+  private async postComment(
+    repo: 'roadmap' | 'rap',
+    issueNumber: number,
+    body: string
+  ): Promise<void> {
+    const res = await fetch(
+      `https://api.github.com/repos/${this.org}/${repo}/issues/${issueNumber}/comments`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/vnd.github+json',
+        },
+        body: JSON.stringify({ body }),
+      }
+    )
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`No se pudo postear el comentario en #${issueNumber}: ${res.status} ${errText}`)
+    }
+    console.log(`[github] Template posteado en ${repo}#${issueNumber}`)
   }
 
   private async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
@@ -91,6 +127,8 @@ export class GitHubDataSource implements DataSource {
                     id
                     number
                     url
+                    title
+                    body
                     comments(last: 10) {
                       nodes { body }
                     }
@@ -126,16 +164,29 @@ export class GitHubDataSource implements DataSource {
           }
         }
 
-        // Only process IN PROD items
+        // Publicamos todo lo que está IN PROD, salvo lo marcado "No comunicar".
         if (fields['Status']?.toUpperCase() !== 'IN PROD') continue
+        if (fields[EXCLUDE_FIELD] === EXCLUDE_VALUE) continue
 
-        const updateComment = [...issue.comments.nodes]
+        let commentBody = [...issue.comments.nodes]
           .reverse()
-          .find(c => c.body?.includes('## 📣 Product Update'))
+          .find(c => c.body?.includes(PRODUCT_UPDATE_HEADER))?.body
 
-        if (!updateComment) continue
+        // Sin comentario template: lo generamos con Groq, lo posteamos en el
+        // issue (queda editable) y lo publicamos en esta misma corrida.
+        if (!commentBody) {
+          const generated = await generateProductUpdate(
+            issue.title ?? '',
+            issue.body ?? ''
+          )
+          commentBody = buildTemplateComment({
+            titulo: generated?.titulo || issue.title || `Issue #${issue.number}`,
+            descripcion: generated?.descripcion,
+          })
+          await this.postComment(repo, issue.number!, commentBody)
+        }
 
-        const parsed = parseComment(updateComment.body)
+        const parsed = parseComment(commentBody)
 
         if (!parsed.tituloAmigable || !parsed.estadoDisponibilidad) {
           console.warn(`[github] #${issue.number} (${repo}): ${parsed.parseErrors.join(', ')}`)
@@ -165,7 +216,7 @@ export class GitHubDataSource implements DataSource {
           onePagerUrl: parsed.onePagerUrl,
           faq: parsed.faq,
           notasInternas: parsed.notasInternas,
-          rawComment: updateComment.body,
+          rawComment: commentBody,
           parseErrors: parsed.parseErrors,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
