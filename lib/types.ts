@@ -52,6 +52,27 @@ export const TIPO_LABELS: Record<string, string> = {
   RAP: 'Desarrollo a medida',
 }
 
+/**
+ * El issueType nativo de GitHub llega con capitalización variable
+ * ("Bug producto", "Bug cliente"). Lo normalizamos a las claves canónicas
+ * que usan TIPO_LABELS / TypeBadge.
+ */
+export function normalizeIssueType(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  switch (raw.trim().toLowerCase()) {
+    case 'story':
+      return 'Story'
+    case 'bug cliente':
+      return 'Bug Cliente'
+    case 'bug producto':
+      return 'Bug Producto'
+    case 'rap':
+      return 'RAP'
+    default:
+      return raw.trim()
+  }
+}
+
 export const ESTADO_LABELS: Record<EstadoDisponibilidad, string> = {
   'rolled-out': 'Disponible',
   flag: 'Feature flag',

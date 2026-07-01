@@ -1,34 +1,53 @@
-import { upsertFeature } from '@/lib/db/repository'
+import {
+  getExistingIds,
+  createFeature,
+  updateFeatureMeta,
+  deleteAllFeatures,
+} from '@/lib/db/repository'
 import { MockDataSource } from './sources/mock'
 import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
 
-export async function runSync(): Promise<{ synced: number; errors: string[] }> {
+export async function runSync(options: { reset?: boolean } = {}): Promise<{
+  created: number
+  updated: number
+  deleted: number
+  errors: string[]
+}> {
   const source: DataSource =
     process.env.DATA_SOURCE === 'github'
       ? new GitHubDataSource(process.env.GITHUB_TOKEN!)
       : new MockDataSource()
 
-  const features = await source.getFeatures()
-  const errors: string[] = []
-  let synced = 0
+  let deleted = 0
+  if (options.reset) {
+    deleted = await deleteAllFeatures()
+    console.log(`[sync] reset: ${deleted} features borradas`)
+  }
 
-  for (const feature of features) {
+  const existingIds = await getExistingIds()
+  const items = await source.getFeatures(existingIds)
+
+  const errors: string[] = []
+  let created = 0
+  let updated = 0
+
+  for (const item of items) {
     try {
-      await upsertFeature(feature)
-      if (feature.parseErrors && feature.parseErrors.length > 0) {
-        console.warn(
-          `[sync] #${feature.issueNumber} (${feature.repo}) warnings: ${feature.parseErrors.join(', ')}`
-        )
+      if (item.isNew) {
+        await createFeature(item.data)
+        created++
+      } else {
+        await updateFeatureMeta(item.data)
+        updated++
       }
-      synced++
     } catch (err) {
-      const msg = `#${feature.issueNumber}: ${err instanceof Error ? err.message : String(err)}`
+      const msg = `#${item.data.issueNumber}: ${err instanceof Error ? err.message : String(err)}`
       errors.push(msg)
-      console.error(`[sync] Error persisting feature: ${msg}`)
+      console.error(`[sync] Error: ${msg}`)
     }
   }
 
-  console.log(`[sync] Done: ${synced} synced, ${errors.length} errors`)
-  return { synced, errors }
+  console.log(`[sync] Done: ${created} creadas, ${updated} actualizadas, ${errors.length} errores`)
+  return { created, updated, deleted, errors }
 }

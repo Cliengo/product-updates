@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge'
 import TypeBadge from '@/components/TypeBadge'
 import PriorityBadge from '@/components/PriorityBadge'
 import CopyButton from '@/components/CopyButton'
-import type { EstadoDisponibilidad, FaqItem } from '@/lib/types'
+import type { EstadoDisponibilidad } from '@/lib/types'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -34,8 +34,6 @@ export default async function FeatureDetailPage({ params }: PageProps) {
   const feature = await getFeatureById(id)
   if (!feature) notFound()
 
-  const faq = feature.faq as FaqItem[] | null
-
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
@@ -52,6 +50,15 @@ export default async function FeatureDetailPage({ params }: PageProps) {
           </Link>
           <span className="text-neutral-300">/</span>
           <span className="text-sm text-neutral-700 font-medium truncate max-w-xs">{feature.tituloAmigable}</span>
+          <Link
+            href={`/features/${feature.id}/edit`}
+            className="ml-auto flex items-center gap-1.5 text-sm text-neutral-500 hover:text-indigo-700 transition-colors flex-shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Editar
+          </Link>
         </div>
       </header>
 
@@ -146,26 +153,6 @@ export default async function FeatureDetailPage({ params }: PageProps) {
               </Section>
             )}
 
-            {/* FAQ */}
-            {faq && faq.length > 0 && (
-              <Section title="FAQ interna">
-                <dl className="space-y-4">
-                  {faq.map((item, i) => (
-                    <div key={i}>
-                      <dt className="text-sm font-medium text-neutral-800 mb-1">{item.pregunta}</dt>
-                      <dd className="text-sm text-neutral-600 leading-relaxed">{item.respuesta}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </Section>
-            )}
-
-            {/* Notas internas */}
-            {feature.notasInternas && (
-              <Section title="Notas internas">
-                <p className="text-sm text-neutral-600 leading-relaxed">{feature.notasInternas}</p>
-              </Section>
-            )}
           </div>
 
           {/* Sidebar */}
@@ -174,9 +161,8 @@ export default async function FeatureDetailPage({ params }: PageProps) {
             <Section title="Detalles">
               <dl className="space-y-3">
                 <StatRow label="Producto" value={feature.producto} />
-                <StatRow label="Plan mínimo" value={feature.planMinimo} />
                 <StatRow label="Aplica a" value={feature.aQuienAplica} />
-                <StatRow label="Release" value={formatDate(feature.milestoneDate)} />
+                <StatRow label="En producción" value={formatDate(feature.milestoneDate)} />
                 <StatRow label="Milestone" value={feature.milestone} />
                 <StatRow label="Repositorio" value={feature.repo === 'roadmap' ? 'Roadmap' : 'RAP'} />
               </dl>

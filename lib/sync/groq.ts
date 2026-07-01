@@ -4,14 +4,17 @@ const DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 export interface GeneratedUpdate {
   titulo: string
   descripcion: string
+  aQuienAplica: string
+  mensajeSugerido: string
 }
 
 /**
- * Genera un título amigable y una descripción para cliente a partir de un
- * issue técnico, usando Groq (API compatible con OpenAI).
+ * Genera el contenido de un product update a partir de un issue técnico, con
+ * Groq (API compatible con OpenAI): título amigable, descripción para cliente,
+ * a quién aplica y un mensaje sugerido para CS/Ventas.
  *
- * Devuelve null si no hay API key configurada o si la llamada falla — el
- * caller debe usar el título original del issue como fallback.
+ * Devuelve null si no hay API key o si la llamada falla — el caller debe usar
+ * el título del issue como fallback.
  */
 export async function generateProductUpdate(
   issueTitle: string,
@@ -25,16 +28,18 @@ export async function generateProductUpdate(
 
   const model = process.env.GROQ_MODELO || DEFAULT_MODEL
   const prompt = [
-    'Dado el siguiente issue técnico, generá en español:',
-    '1. Un título amigable para equipos internos (Marketing, CS, Ventas). Máximo 8 palabras, sin tecnicismos.',
-    '2. Una descripción para el cliente de 1 a 2 oraciones. Explicá qué hace la funcionalidad y qué valor le da al cliente. Sin tecnicismos.',
+    'Sos un asistente de Producto. Dado el siguiente issue técnico, generá en español, sin tecnicismos:',
+    '1. "titulo": título amigable para equipos internos (Marketing, CS, Ventas). Máx 8 palabras.',
+    '2. "descripcion": 1 a 2 oraciones. Qué hace la funcionalidad y qué valor le da al cliente.',
+    '3. "aQuienAplica": a qué usuarios/planes aplica, inferido del contexto. Si no se puede inferir, poné "".',
+    '4. "mensajeSugerido": mensaje corto y listo para que CS/Ventas le comunique al cliente.',
     '',
     `Título técnico: ${issueTitle}`,
     '',
-    `Descripción técnica:\n${(issueBody || '').slice(0, 1000)}`,
+    `Descripción técnica:\n${(issueBody || '').slice(0, 1200)}`,
     '',
-    'Respondé ÚNICAMENTE con un JSON con este formato exacto (sin markdown, sin explicaciones):',
-    '{"titulo": "...", "descripcion": "..."}',
+    'Respondé ÚNICAMENTE con un JSON válido, sin markdown ni explicaciones:',
+    '{"titulo":"...","descripcion":"...","aQuienAplica":"...","mensajeSugerido":"..."}',
   ].join('\n')
 
   try {
@@ -46,7 +51,7 @@ export async function generateProductUpdate(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 300,
+        max_tokens: 600,
         temperature: 0.3,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
@@ -69,6 +74,8 @@ export async function generateProductUpdate(
     return {
       titulo: String(parsed.titulo).trim(),
       descripcion: String(parsed.descripcion ?? '').trim(),
+      aQuienAplica: String(parsed.aQuienAplica ?? '').trim(),
+      mensajeSugerido: String(parsed.mensajeSugerido ?? '').trim(),
     }
   } catch (err) {
     console.warn(

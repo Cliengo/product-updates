@@ -8,8 +8,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // ?reset=1 borra toda la data antes de sincronizar (limpieza puntual).
+  const reset = new URL(request.url).searchParams.get('reset') === '1'
+
   try {
-    const result = await runSync()
+    const result = await runSync({ reset })
     return NextResponse.json(result)
   } catch (err) {
     return NextResponse.json(

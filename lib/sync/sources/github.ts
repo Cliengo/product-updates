@@ -1,8 +1,7 @@
-import type { FeatureData } from '@/lib/types'
 import type { DataSource } from './mock'
-import { parseComment } from '../parsers/comment'
+import type { SyncItem, SyncMetadata } from '../types'
+import { normalizeIssueType } from '@/lib/types'
 import { generateProductUpdate } from '../groq'
-import { buildTemplateComment, PRODUCT_UPDATE_HEADER } from '../template'
 import { passesCutoff } from '../cutoff'
 
 /**
@@ -24,12 +23,22 @@ interface ProjectItemsResponse {
           url?: string
           title?: string
           body?: string
-          comments: { nodes: { body: string }[] }
+          issueType?: { name: string } | null
           milestone?: { title: string; dueOn?: string }
         } | null
       }[]
     }
   }
+}
+
+/** Primera imagen del cuerpo del issue (markdown o <img>), como sugerencia de captura. */
+function firstImage(body: string | undefined): string | null {
+  if (!body) return null
+  const md = body.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)
+  if (md) return md[1]
+  const html = body.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i)
+  if (html) return html[1]
+  return null
 }
 
 export class GitHubDataSource implements DataSource {
@@ -41,37 +50,12 @@ export class GitHubDataSource implements DataSource {
     this.org = org
   }
 
-  async getFeatures(): Promise<FeatureData[]> {
+  async getFeatures(existingIds: Set<string>): Promise<SyncItem[]> {
     const [roadmap, rap] = await Promise.all([
-      this.fetchFromProject('roadmap'),
-      this.fetchFromProject('rap'),
+      this.fetchFromProject('roadmap', existingIds),
+      this.fetchFromProject('rap', existingIds),
     ])
     return [...roadmap, ...rap]
-  }
-
-  /** Postea un comentario en un issue vía la REST API. Requiere token con issues:write. */
-  private async postComment(
-    repo: 'roadmap' | 'rap',
-    issueNumber: number,
-    body: string
-  ): Promise<void> {
-    const res = await fetch(
-      `https://api.github.com/repos/${this.org}/${repo}/issues/${issueNumber}/comments`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/vnd.github+json',
-        },
-        body: JSON.stringify({ body }),
-      }
-    )
-    if (!res.ok) {
-      const errText = await res.text()
-      throw new Error(`No se pudo postear el comentario en #${issueNumber}: ${res.status} ${errText}`)
-    }
-    console.log(`[github] Template posteado en ${repo}#${issueNumber}`)
   }
 
   private async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
@@ -89,7 +73,10 @@ export class GitHubDataSource implements DataSource {
     return json.data
   }
 
-  private async fetchFromProject(repo: 'roadmap' | 'rap'): Promise<FeatureData[]> {
+  private async fetchFromProject(
+    repo: 'roadmap' | 'rap',
+    existingIds: Set<string>
+  ): Promise<SyncItem[]> {
     const projectId =
       repo === 'roadmap'
         ? process.env.GITHUB_PROJECT_ID_ROADMAP
@@ -107,7 +94,7 @@ export class GitHubDataSource implements DataSource {
             items(first: 100, after: $cursor) {
               pageInfo { hasNextPage endCursor }
               nodes {
-                fieldValues(first: 20) {
+                fieldValues(first: 30) {
                   nodes {
                     ... on ProjectV2ItemFieldSingleSelectValue {
                       name
@@ -130,9 +117,7 @@ export class GitHubDataSource implements DataSource {
                     url
                     title
                     body
-                    comments(last: 10) {
-                      nodes { body }
-                    }
+                    issueType { name }
                     milestone { title dueOn }
                   }
                 }
@@ -143,7 +128,7 @@ export class GitHubDataSource implements DataSource {
       }
     `
 
-    const features: FeatureData[] = []
+    const items: SyncItem[] = []
     let cursor: string | null = null
 
     do {
@@ -172,65 +157,48 @@ export class GitHubDataSource implements DataSource {
         // Corte por Code Freeze: solo CF 29/06 en adelante (evita backfill del histórico).
         if (!passesCutoff(issue.milestone?.title)) continue
 
-        let commentBody = [...issue.comments.nodes]
-          .reverse()
-          .find(c => c.body?.includes(PRODUCT_UPDATE_HEADER))?.body
+        // Fecha de puesta en producción ("In Prod At"); fallback al release del milestone.
+        const inProdDate = fields['In Prod At'] || issue.milestone?.dueOn || null
 
-        // Sin comentario template: lo generamos con Groq, lo posteamos en el
-        // issue (queda editable) y lo publicamos en esta misma corrida.
-        if (!commentBody) {
-          const generated = await generateProductUpdate(
-            issue.title ?? '',
-            issue.body ?? ''
-          )
-          commentBody = buildTemplateComment({
-            titulo: generated?.titulo || issue.title || `Issue #${issue.number}`,
-            descripcion: generated?.descripcion,
-          })
-          await this.postComment(repo, issue.number!, commentBody)
-        }
-
-        const parsed = parseComment(commentBody)
-
-        if (!parsed.tituloAmigable || !parsed.estadoDisponibilidad) {
-          console.warn(`[github] #${issue.number} (${repo}): ${parsed.parseErrors.join(', ')}`)
-          continue
-        }
-
-        features.push({
+        const meta: SyncMetadata = {
           id: issue.id,
           issueNumber: issue.number!,
           issueUrl: issue.url!,
           repo,
           producto: fields['Producto'],
           priority: fields['Priority'],
-          type: fields['Type'],
+          type: normalizeIssueType(issue.issueType?.name),
           milestone: issue.milestone?.title,
-          milestoneDate: issue.milestone?.dueOn,
+          milestoneDate: inProdDate,
           githubStatus: fields['Status'],
-          tituloAmigable: parsed.tituloAmigable,
-          descripcionCliente: parsed.descripcionCliente,
-          featureFlag: parsed.featureFlag,
-          estadoDisponibilidad: parsed.estadoDisponibilidad,
-          planMinimo: parsed.planMinimo,
-          aQuienAplica: parsed.aQuienAplica,
-          mensajeSugerido: parsed.mensajeSugerido,
-          screenshotsUrl: parsed.screenshotsUrl,
-          videoUrl: parsed.videoUrl,
-          onePagerUrl: parsed.onePagerUrl,
-          faq: parsed.faq,
-          notasInternas: parsed.notasInternas,
-          rawComment: commentBody,
-          parseErrors: parsed.parseErrors,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          syncedAt: new Date().toISOString(),
+        }
+
+        // Existente: solo actualizamos metadatos, nunca regeneramos ni pisamos ediciones.
+        if (existingIds.has(issue.id)) {
+          items.push({ isNew: false, data: meta })
+          continue
+        }
+
+        // Nueva: generamos el contenido con Groq (fallback al título del issue).
+        const generated = await generateProductUpdate(issue.title ?? '', issue.body ?? '')
+        items.push({
+          isNew: true,
+          data: {
+            ...meta,
+            tituloAmigable: generated?.titulo || issue.title || `Issue #${issue.number}`,
+            descripcionCliente: generated?.descripcion || null,
+            aQuienAplica: generated?.aQuienAplica || null,
+            mensajeSugerido: generated?.mensajeSugerido || null,
+            screenshotsUrl: firstImage(issue.body),
+            featureFlag: null,
+            estadoDisponibilidad: 'rolled-out',
+          },
         })
       }
 
       cursor = pageInfo.hasNextPage ? pageInfo.endCursor : null
     } while (cursor)
 
-    return features
+    return items
   }
 }

@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import type { Prisma } from '../../app/generated/prisma/client'
 import type { FeatureData, FaqItem, EstadoDisponibilidad } from '@/lib/types'
+import type { NewFeatureData, SyncMetadata } from '@/lib/sync/types'
 
 function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>): FeatureData {
   if (!raw) throw new Error('Feature not found')
@@ -86,4 +87,87 @@ export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updat
     update: payload,
     create: { id: data.id, ...payload },
   })
+}
+
+/** IDs de todas las features ya persistidas (para saber cuáles son nuevas en el sync). */
+export async function getExistingIds(): Promise<Set<string>> {
+  const rows = await prisma.feature.findMany({ select: { id: true } })
+  return new Set(rows.map(r => r.id))
+}
+
+/** Crea una feature nueva con el contenido generado por IA. Idempotente por id. */
+export async function createFeature(data: NewFeatureData): Promise<void> {
+  const payload = {
+    issueNumber: data.issueNumber,
+    issueUrl: data.issueUrl,
+    repo: data.repo,
+    producto: data.producto ?? null,
+    priority: data.priority ?? null,
+    type: data.type ?? null,
+    milestone: data.milestone ?? null,
+    milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
+    githubStatus: data.githubStatus ?? null,
+    tituloAmigable: data.tituloAmigable,
+    descripcionCliente: data.descripcionCliente ?? null,
+    aQuienAplica: data.aQuienAplica ?? null,
+    mensajeSugerido: data.mensajeSugerido ?? null,
+    featureFlag: data.featureFlag ?? null,
+    screenshotsUrl: data.screenshotsUrl ?? null,
+    estadoDisponibilidad: data.estadoDisponibilidad,
+    syncedAt: new Date(),
+  }
+  await prisma.feature.upsert({
+    where: { id: data.id },
+    update: {}, // ya existe → no la tocamos acá (la maneja updateFeatureMeta)
+    create: { id: data.id, ...payload },
+  })
+}
+
+/** Actualiza SOLO los metadatos que vienen de GitHub. Nunca pisa el texto editado. */
+export async function updateFeatureMeta(data: SyncMetadata): Promise<void> {
+  await prisma.feature.update({
+    where: { id: data.id },
+    data: {
+      issueUrl: data.issueUrl,
+      producto: data.producto ?? null,
+      priority: data.priority ?? null,
+      type: data.type ?? null,
+      milestone: data.milestone ?? null,
+      milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
+      githubStatus: data.githubStatus ?? null,
+      syncedAt: new Date(),
+    },
+  })
+}
+
+export interface EditableContent {
+  tituloAmigable: string
+  descripcionCliente?: string | null
+  aQuienAplica?: string | null
+  mensajeSugerido?: string | null
+  featureFlag?: string | null
+  screenshotsUrl?: string | null
+  estadoDisponibilidad: EstadoDisponibilidad
+}
+
+/** Guarda las ediciones hechas a mano en el admin. */
+export async function updateFeatureContent(id: string, data: EditableContent): Promise<void> {
+  await prisma.feature.update({
+    where: { id },
+    data: {
+      tituloAmigable: data.tituloAmigable,
+      descripcionCliente: data.descripcionCliente ?? null,
+      aQuienAplica: data.aQuienAplica ?? null,
+      mensajeSugerido: data.mensajeSugerido ?? null,
+      featureFlag: data.featureFlag ?? null,
+      screenshotsUrl: data.screenshotsUrl ?? null,
+      estadoDisponibilidad: data.estadoDisponibilidad,
+    },
+  })
+}
+
+/** Borra todas las features (usado por el reset del sync). */
+export async function deleteAllFeatures(): Promise<number> {
+  const res = await prisma.feature.deleteMany({})
+  return res.count
 }
