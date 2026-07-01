@@ -3,6 +3,7 @@ import type { DataSource } from './mock'
 import { parseComment } from '../parsers/comment'
 import { generateProductUpdate } from '../groq'
 import { buildTemplateComment, PRODUCT_UPDATE_HEADER } from '../template'
+import { passesCutoff } from '../cutoff'
 
 /**
  * Campo single-select del Project. Todo lo que llega a IN PROD se publica;
@@ -167,6 +168,9 @@ export class GitHubDataSource implements DataSource {
         // Publicamos todo lo que está IN PROD, salvo lo marcado "No comunicar".
         if (fields['Status']?.toUpperCase() !== 'IN PROD') continue
         if (fields[EXCLUDE_FIELD] === EXCLUDE_VALUE) continue
+
+        // Corte por Code Freeze: solo CF 29/06 en adelante (evita backfill del histórico).
+        if (!passesCutoff(issue.milestone?.title)) continue
 
         let commentBody = [...issue.comments.nodes]
           .reverse()
