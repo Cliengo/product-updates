@@ -4,6 +4,7 @@ import StatusBadge from './StatusBadge'
 import TypeBadge from './TypeBadge'
 import PriorityBadge from './PriorityBadge'
 import AssetIndicators from './AssetIndicators'
+import { imageSrc } from '@/lib/utils'
 import type { EstadoDisponibilidad } from '@/lib/types'
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -58,6 +59,17 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
             <p className="text-sm text-neutral-500 leading-relaxed line-clamp-2">
               {feature.descripcionCliente}
             </p>
+          )}
+
+          {/* Screenshot preview */}
+          {imageSrc(feature.screenshotsUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageSrc(feature.screenshotsUrl)!}
+              alt={`Captura de ${feature.tituloAmigable}`}
+              loading="lazy"
+              className="w-full h-40 object-cover object-top rounded-lg border border-neutral-100 bg-neutral-50"
+            />
           )}
 
           {/* Footer */}
