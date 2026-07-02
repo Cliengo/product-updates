@@ -1,11 +1,40 @@
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+const MAX_RETRIES = 4
 
 export interface GeneratedUpdate {
   titulo: string
   descripcion: string
   aQuienAplica: string
   mensajeSugerido: string
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * POST a Groq con reintentos ante 429 (rate limit por tokens/minuto) y 5xx,
+ * respetando el header Retry-After. Clave cuando el sync genera muchos items
+ * seguidos y se pasa del TPM del plan.
+ */
+async function groqFetch(apiKey: string, body: string): Promise<Response | null> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(GROQ_ENDPOINT, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body,
+    })
+    if (res.status !== 429 && res.status < 500) return res
+    if (attempt === MAX_RETRIES) return res
+
+    const retryAfter = Number(res.headers.get('retry-after'))
+    const waitMs = Math.min(
+      retryAfter > 0 ? retryAfter * 1000 : 2000 * (attempt + 1),
+      15000
+    )
+    console.warn(`[groq] ${res.status}, reintento ${attempt + 1}/${MAX_RETRIES} en ${waitMs}ms`)
+    await sleep(waitMs)
+  }
+  return null
 }
 
 /**
@@ -36,31 +65,27 @@ export async function generateProductUpdate(
     '',
     `Título técnico: ${issueTitle}`,
     '',
-    `Descripción técnica:\n${(issueBody || '').slice(0, 1200)}`,
+    `Descripción técnica:\n${(issueBody || '').slice(0, 700)}`,
     '',
     'Respondé ÚNICAMENTE con un JSON válido, sin markdown ni explicaciones:',
     '{"titulo":"...","descripcion":"...","aQuienAplica":"...","mensajeSugerido":"..."}',
   ].join('\n')
 
   try {
-    const res = await fetch(GROQ_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const res = await groqFetch(
+      apiKey,
+      JSON.stringify({
         model,
         max_tokens: 600,
         temperature: 0.3,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+      })
+    )
 
-    if (!res.ok) {
-      const errText = await res.text()
-      console.warn(`[groq] error ${res.status}: ${errText}`)
+    if (!res || !res.ok) {
+      const errText = res ? await res.text() : 'sin respuesta'
+      console.warn(`[groq] error ${res?.status ?? '-'}: ${errText}`)
       return null
     }
 

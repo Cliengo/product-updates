@@ -188,6 +188,8 @@ export class GitHubDataSource implements DataSource {
         }
 
         // Nueva: generamos el contenido con Groq (fallback al título del issue).
+        // Ritmo entre llamadas para no pasarnos del límite de tokens/minuto de Groq.
+        await new Promise(r => setTimeout(r, 900))
         const generated = await generateProductUpdate(issue.title ?? '', issue.body ?? '')
         items.push({
           isNew: true,

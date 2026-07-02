@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { runSync } from '@/lib/sync'
 
+// El sync genera muchos items con IA (con pausas por rate limit) → necesita margen.
+export const maxDuration = 300
+
 export async function POST(request: Request) {
   const token = request.headers.get('Authorization')?.replace('Bearer ', '')
 
