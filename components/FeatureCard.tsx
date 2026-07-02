@@ -81,6 +81,11 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
                   {feature.producto}
                 </span>
               )}
+              {feature.milestone && (
+                <span className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-md px-2 py-0.5">
+                  {feature.milestone}
+                </span>
+              )}
             </div>
             <AssetIndicators
               video={feature.videoUrl}

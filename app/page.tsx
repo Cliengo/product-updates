@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getFeatures, type FeatureFilters as FilterParams } from '@/lib/db/repository'
+import { getFeatures, getReleases, type FeatureFilters as FilterParams } from '@/lib/db/repository'
 import FeatureCard from '@/components/FeatureCard'
 import FeatureFilters from '@/components/FeatureFilters'
 
@@ -9,6 +9,7 @@ interface PageProps {
     producto?: string
     priority?: string
     tipo?: string
+    release?: string
     q?: string
   }>
 }
@@ -20,9 +21,10 @@ export default async function LandingPage({ searchParams }: PageProps) {
     producto: params.producto,
     priority: params.priority,
     tipo: params.tipo,
+    release: params.release,
     q: params.q,
   }
-  const features = await getFeatures(filters)
+  const [features, releases] = await Promise.all([getFeatures(filters), getReleases()])
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -51,7 +53,7 @@ export default async function LandingPage({ searchParams }: PageProps) {
         </div>
 
         <Suspense>
-          <FeatureFilters currentFilters={params} totalCount={features.length} />
+          <FeatureFilters currentFilters={params} totalCount={features.length} releases={releases} />
         </Suspense>
 
         {features.length === 0 ? (

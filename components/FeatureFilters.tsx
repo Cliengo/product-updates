@@ -11,12 +11,14 @@ interface FeatureFiltersProps {
     producto?: string
     priority?: string
     tipo?: string
+    release?: string
     q?: string
   }
   totalCount: number
+  releases: string[]
 }
 
-export default function FeatureFilters({ currentFilters, totalCount }: FeatureFiltersProps) {
+export default function FeatureFilters({ currentFilters, totalCount, releases }: FeatureFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -91,6 +93,12 @@ export default function FeatureFilters({ currentFilters, totalCount }: FeatureFi
           value={currentFilters.tipo ?? ''}
           onChange={v => updateFilter('tipo', v)}
           options={TIPOS.map(t => ({ value: t, label: TIPO_LABELS[t] ?? t }))}
+        />
+        <SelectFilter
+          label="Release"
+          value={currentFilters.release ?? ''}
+          onChange={v => updateFilter('release', v)}
+          options={releases.map(r => ({ value: r, label: r }))}
         />
 
         {hasFilters && (

@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import type { Prisma } from '../../app/generated/prisma/client'
 import type { FeatureData, FaqItem, EstadoDisponibilidad } from '@/lib/types'
 import type { NewFeatureData, SyncMetadata } from '@/lib/sync/types'
+import { parseCfDate } from '@/lib/sync/cutoff'
 
 function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>): FeatureData {
   if (!raw) throw new Error('Feature not found')
@@ -22,6 +23,7 @@ export interface FeatureFilters {
   producto?: string
   priority?: string
   tipo?: string
+  release?: string
   q?: string
 }
 
@@ -32,6 +34,7 @@ export async function getFeatures(filters: FeatureFilters): Promise<FeatureData[
   if (filters.producto) where.producto = filters.producto
   if (filters.priority) where.priority = filters.priority
   if (filters.tipo) where.type = filters.tipo
+  if (filters.release) where.milestone = filters.release
   if (filters.q) {
     where.OR = [
       { tituloAmigable: { contains: filters.q } },
@@ -46,6 +49,20 @@ export async function getFeatures(filters: FeatureFilters): Promise<FeatureData[
   })
 
   return features.map(f => deserialize(f))
+}
+
+/** Releases (milestones "CF DD/MM") presentes, ordenados del más nuevo al más viejo. */
+export async function getReleases(): Promise<string[]> {
+  const rows = await prisma.feature.findMany({
+    where: { milestone: { not: null } },
+    select: { milestone: true },
+    distinct: ['milestone'],
+  })
+  const ref = process.env.PUBLISH_CF_CUTOFF || '2026-06-29'
+  return rows
+    .map(r => r.milestone!)
+    .filter(Boolean)
+    .sort((a, b) => (parseCfDate(b, ref) ?? -Infinity) - (parseCfDate(a, ref) ?? -Infinity))
 }
 
 export async function getFeatureById(id: string): Promise<FeatureData | null> {
