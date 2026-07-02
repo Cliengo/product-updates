@@ -15,7 +15,7 @@ interface FeatureFiltersProps {
     q?: string
   }
   totalCount: number
-  releases: string[]
+  releases: { value: string; label: string }[]
 }
 
 export default function FeatureFilters({ currentFilters, totalCount, releases }: FeatureFiltersProps) {
@@ -98,7 +98,7 @@ export default function FeatureFilters({ currentFilters, totalCount, releases }:
           label="Release"
           value={currentFilters.release ?? ''}
           onChange={v => updateFilter('release', v)}
-          options={releases.map(r => ({ value: r, label: r }))}
+          options={releases}
         />
 
         {hasFilters && (

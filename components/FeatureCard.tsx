@@ -4,7 +4,7 @@ import StatusBadge from './StatusBadge'
 import TypeBadge from './TypeBadge'
 import PriorityBadge from './PriorityBadge'
 import AssetIndicators from './AssetIndicators'
-import { imageSrc } from '@/lib/utils'
+import { imageSrc, releaseLabel } from '@/lib/utils'
 import type { EstadoDisponibilidad } from '@/lib/types'
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -38,7 +38,13 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
         <div className="p-5 flex flex-col gap-3 flex-1">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
-            <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} />
+            <div className="flex items-center gap-2 flex-wrap">
+              {feature.type && <TypeBadge type={feature.type} />}
+              {/* El estado solo se muestra si NO es "Disponible" (beta, deprecado, etc.) */}
+              {feature.estadoDisponibilidad !== 'rolled-out' && (
+                <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} />
+              )}
+            </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {feature.priority && <PriorityBadge priority={feature.priority} />}
               <span className="text-xs text-neutral-400">{formatDate(feature.milestoneDate)}</span>
@@ -75,7 +81,6 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
           {/* Footer */}
           <div className="mt-auto pt-3 border-t border-neutral-100 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
-              {feature.type && <TypeBadge type={feature.type} />}
               {feature.producto && (
                 <span className="text-xs text-neutral-400 border border-neutral-200 rounded-md px-2 py-0.5">
                   {feature.producto}
@@ -83,7 +88,7 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
               )}
               {feature.milestone && (
                 <span className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-md px-2 py-0.5">
-                  {feature.milestone}
+                  {releaseLabel(feature.milestone, feature.milestoneDate)}
                 </span>
               )}
             </div>

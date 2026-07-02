@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge'
 import TypeBadge from '@/components/TypeBadge'
 import PriorityBadge from '@/components/PriorityBadge'
 import CopyButton from '@/components/CopyButton'
-import { imageSrc } from '@/lib/utils'
+import { imageSrc, releaseLabel } from '@/lib/utils'
 import type { EstadoDisponibilidad } from '@/lib/types'
 
 interface PageProps {
@@ -67,8 +67,10 @@ export default async function FeatureDetailPage({ params }: PageProps) {
         {/* Hero */}
         <div className="bg-white rounded-xl border border-neutral-200 p-8">
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} size="md" />
             {feature.type && <TypeBadge type={feature.type} />}
+            {feature.estadoDisponibilidad !== 'rolled-out' && (
+              <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} size="md" />
+            )}
             {feature.priority && (
               <span className="inline-flex items-center gap-1.5 text-sm text-neutral-500">
                 <PriorityBadge priority={feature.priority} />
@@ -163,7 +165,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                 <StatRow label="Producto" value={feature.producto} />
                 <StatRow label="Aplica a" value={feature.aQuienAplica} />
                 <StatRow label="En producción" value={formatDate(feature.milestoneDate)} />
-                <StatRow label="Milestone" value={feature.milestone} />
+                <StatRow label="Release" value={releaseLabel(feature.milestone, feature.milestoneDate)} />
                 <StatRow label="Repositorio" value={feature.repo === 'roadmap' ? 'Roadmap' : 'RAP'} />
               </dl>
             </Section>
