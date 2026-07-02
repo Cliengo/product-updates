@@ -12,6 +12,7 @@ export interface SyncMetadata {
   producto?: string | null
   priority?: string | null
   type?: string | null
+  companyId?: string | null
   milestone?: string | null
   milestoneDate?: string | null
   githubStatus?: string | null

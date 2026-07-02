@@ -41,6 +41,7 @@ export async function getFeatures(filters: FeatureFilters): Promise<FeatureData[
       { tituloAmigable: { contains: filters.q } },
       { descripcionCliente: { contains: filters.q } },
       { producto: { contains: filters.q } },
+      { companyId: { contains: filters.q } },
     ]
   }
 
@@ -88,6 +89,7 @@ export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updat
     producto: data.producto ?? null,
     priority: data.priority ?? null,
     type: data.type ?? null,
+    companyId: data.companyId ?? null,
     milestone: data.milestone ?? null,
     milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
     githubStatus: data.githubStatus ?? null,
@@ -115,6 +117,16 @@ export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updat
   })
 }
 
+/**
+ * Asegura columnas agregadas después del deploy inicial (idempotente).
+ * Evita depender de `prisma db push` en el build (riesgoso con conexiones pooled).
+ */
+export async function ensureSchema(): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "Feature" ADD COLUMN IF NOT EXISTS "companyId" TEXT'
+  )
+}
+
 /** IDs de todas las features ya persistidas (para saber cuáles son nuevas en el sync). */
 export async function getExistingIds(): Promise<Set<string>> {
   const rows = await prisma.feature.findMany({ select: { id: true } })
@@ -130,6 +142,7 @@ export async function createFeature(data: NewFeatureData): Promise<void> {
     producto: data.producto ?? null,
     priority: data.priority ?? null,
     type: data.type ?? null,
+    companyId: data.companyId ?? null,
     milestone: data.milestone ?? null,
     milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
     githubStatus: data.githubStatus ?? null,
@@ -158,6 +171,7 @@ export async function updateFeatureMeta(data: SyncMetadata): Promise<void> {
       producto: data.producto ?? null,
       priority: data.priority ?? null,
       type: data.type ?? null,
+      companyId: data.companyId ?? null,
       milestone: data.milestone ?? null,
       milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
       githubStatus: data.githubStatus ?? null,

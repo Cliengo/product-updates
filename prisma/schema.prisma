@@ -16,6 +16,7 @@ model Feature {
   producto             String?
   priority             String?
   type                 String?
+  companyId            String?
   milestone            String?
   milestoneDate        DateTime?
   githubStatus         String?

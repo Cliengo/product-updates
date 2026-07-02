@@ -91,6 +91,14 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
                   {releaseLabel(feature.milestone, feature.milestoneDate)}
                 </span>
               )}
+              {feature.companyId && (
+                <span
+                  className="text-[11px] font-mono text-neutral-500 bg-neutral-100 rounded-md px-2 py-0.5"
+                  title="Company ID del cliente afectado"
+                >
+                  🏢 {feature.companyId}
+                </span>
+              )}
             </div>
             <AssetIndicators
               video={feature.videoUrl}

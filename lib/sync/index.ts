@@ -1,4 +1,5 @@
 import {
+  ensureSchema,
   getExistingIds,
   createFeature,
   updateFeatureMeta,
@@ -18,6 +19,8 @@ export async function runSync(options: { reset?: boolean } = {}): Promise<{
     process.env.DATA_SOURCE === 'github'
       ? new GitHubDataSource(process.env.GITHUB_TOKEN!)
       : new MockDataSource()
+
+  await ensureSchema()
 
   let deleted = 0
   if (options.reset) {

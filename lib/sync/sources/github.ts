@@ -37,6 +37,15 @@ function stripTag(title: string | undefined): string {
   return (title ?? '').replace(/^\s*(\[[^\]]+\]\s*)+/, '').trim()
 }
 
+/** Company ID (ObjectId de 24 hex) del cliente afectado, de la sección "CompanyId Prod". */
+function extractCompanyId(body: string | undefined): string | null {
+  if (!body) return null
+  const section = body.match(/###\s+CompanyId Prod\s*\n([\s\S]*?)(?=\n###|$)/i)
+  if (!section) return null
+  const id = section[1].match(/[0-9a-f]{24}/i)
+  return id ? id[0] : null
+}
+
 /** Primera imagen del cuerpo del issue (markdown o <img>), como sugerencia de captura. */
 function firstImage(body: string | undefined): string | null {
   if (!body) return null
@@ -176,6 +185,7 @@ export class GitHubDataSource implements DataSource {
           producto: fields['Producto'],
           priority: fields['Priority'],
           type: normalizeIssueType(issue.issueType?.name),
+          companyId: extractCompanyId(issue.body),
           milestone: issue.milestone?.title,
           milestoneDate: inProdDate,
           githubStatus: fields['Status'],

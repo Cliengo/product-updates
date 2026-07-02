@@ -163,6 +163,12 @@ export default async function FeatureDetailPage({ params }: PageProps) {
             <Section title="Detalles">
               <dl className="space-y-3">
                 <StatRow label="Producto" value={feature.producto} />
+                {feature.companyId && (
+                  <div className="flex justify-between items-start gap-2">
+                    <dt className="text-xs text-neutral-400 flex-shrink-0">Company ID</dt>
+                    <dd className="text-xs text-neutral-700 font-mono text-right break-all">{feature.companyId}</dd>
+                  </div>
+                )}
                 <StatRow label="Aplica a" value={feature.aQuienAplica} />
                 <StatRow label="En producción" value={formatDate(feature.milestoneDate)} />
                 <StatRow label="Release" value={releaseLabel(feature.milestone, feature.milestoneDate)} />
