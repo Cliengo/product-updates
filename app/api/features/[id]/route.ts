@@ -9,7 +9,13 @@ interface RouteContext {
 export async function PUT(request: Request, { params }: RouteContext) {
   // Auth simple: contraseña compartida. Ver el sitio es libre; solo editar la pide.
   const password = request.headers.get('x-edit-password')
-  if (!process.env.EDIT_PASSWORD || password !== process.env.EDIT_PASSWORD) {
+  if (!process.env.EDIT_PASSWORD) {
+    return NextResponse.json(
+      { error: 'EDIT_PASSWORD no está configurada en el servidor (Vercel)' },
+      { status: 503 }
+    )
+  }
+  if (password !== process.env.EDIT_PASSWORD) {
     return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 401 })
   }
 
