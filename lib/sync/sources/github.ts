@@ -23,12 +23,18 @@ interface ProjectItemsResponse {
           url?: string
           title?: string
           body?: string
+          closedAt?: string
           issueType?: { name: string } | null
           milestone?: { title: string; dueOn?: string }
         } | null
       }[]
     }
   }
+}
+
+/** Quita prefijos tipo "[Story] " / "[Bug Producto] " del título (para el fallback). */
+function stripTag(title: string | undefined): string {
+  return (title ?? '').replace(/^\s*(\[[^\]]+\]\s*)+/, '').trim()
 }
 
 /** Primera imagen del cuerpo del issue (markdown o <img>), como sugerencia de captura. */
@@ -117,6 +123,7 @@ export class GitHubDataSource implements DataSource {
                     url
                     title
                     body
+                    closedAt
                     issueType { name }
                     milestone { title dueOn }
                   }
@@ -157,8 +164,9 @@ export class GitHubDataSource implements DataSource {
         // Corte por Code Freeze: solo CF 29/06 en adelante (evita backfill del histórico).
         if (!passesCutoff(issue.milestone?.title)) continue
 
-        // Fecha de puesta en producción ("In Prod At"); fallback al release del milestone.
-        const inProdDate = fields['In Prod At'] || issue.milestone?.dueOn || null
+        // Fecha de puesta en producción: "In Prod At" (oficial) → cierre del issue → release.
+        const inProdDate =
+          fields['In Prod At'] || issue.closedAt || issue.milestone?.dueOn || null
 
         const meta: SyncMetadata = {
           id: issue.id,
@@ -185,7 +193,7 @@ export class GitHubDataSource implements DataSource {
           isNew: true,
           data: {
             ...meta,
-            tituloAmigable: generated?.titulo || issue.title || `Issue #${issue.number}`,
+            tituloAmigable: generated?.titulo || stripTag(issue.title) || `Issue #${issue.number}`,
             descripcionCliente: generated?.descripcion || null,
             aQuienAplica: generated?.aQuienAplica || null,
             mensajeSugerido: generated?.mensajeSugerido || null,
