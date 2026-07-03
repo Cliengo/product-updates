@@ -21,6 +21,9 @@ jobs:
             URL="$URL?reset=1"
             echo "Reset activado — se borrará toda la data antes de sincronizar."
           fi
-          curl -s -f -X POST "$URL" \
+          resp=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json")
+          echo "Resultado del sync: $resp"
+          code=$(echo "$resp" | tail -1)
+          if [ "$code" != "200" ]; then echo "Sync falló (HTTP $code)"; exit 1; fi
