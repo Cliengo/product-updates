@@ -26,6 +26,7 @@ interface ProjectItemsResponse {
           closedAt?: string
           issueType?: { name: string } | null
           milestone?: { title: string; dueOn?: string }
+          comments?: { nodes: { body: string }[] }
         } | null
       }[]
     }
@@ -37,13 +38,30 @@ function stripTag(title: string | undefined): string {
   return (title ?? '').replace(/^\s*(\[[^\]]+\]\s*)+/, '').trim()
 }
 
-/** Company ID (ObjectId de 24 hex) del cliente afectado, de la sección "CompanyId Prod". */
-function extractCompanyId(body: string | undefined): string | null {
-  if (!body) return null
-  const section = body.match(/###\s+CompanyId Prod\s*\n([\s\S]*?)(?=\n###|$)/i)
-  if (!section) return null
-  const id = section[1].match(/[0-9a-f]{24}/i)
-  return id ? id[0] : null
+/** Primer ObjectId (24 hex) que aparezca en un texto. */
+function firstObjectId(text: string | null | undefined): string | null {
+  if (!text) return null
+  const m = text.match(/[0-9a-f]{24}/i)
+  return m ? m[0].toLowerCase() : null
+}
+
+/**
+ * Company ID del cliente afectado (roadmap). Prioridad:
+ * 1) sección "### CompanyId Prod" del body,
+ * 2) patrón "company id: <ObjectId>" en body o comentarios (así también aparece
+ *    en stories donde queda suelto). Se busca etiquetado para NO tomar el WebsiteId.
+ */
+function extractCompanyId(body: string | undefined, comments: string[]): string | null {
+  const section = body?.match(/###\s+CompanyId Prod\s*\n([\s\S]*?)(?=\n###|$)/i)
+  const secId = firstObjectId(section?.[1])
+  if (secId) return secId
+
+  const labeled = /company[\s_-]*id[:\s#]*\**\s*([0-9a-f]{24})/i
+  for (const text of [body ?? '', ...comments]) {
+    const m = text.match(labeled)
+    if (m) return m[1].toLowerCase()
+  }
+  return null
 }
 
 /** Primera imagen del cuerpo del issue (markdown o <img>), como sugerencia de captura. */
@@ -135,6 +153,7 @@ export class GitHubDataSource implements DataSource {
                     closedAt
                     issueType { name }
                     milestone { title dueOn }
+                    comments(last: 30) { nodes { body } }
                   }
                 }
               }
@@ -166,16 +185,27 @@ export class GitHubDataSource implements DataSource {
           }
         }
 
-        // Publicamos todo lo que está IN PROD, salvo lo marcado "No comunicar".
-        if (fields['Status']?.toUpperCase() !== 'IN PROD') continue
+        // Estado que dispara la publicación: roadmap → IN PROD; RAP → Productizado.
+        const isRap = repo === 'rap'
+        const publishStatus = isRap ? 'PRODUCTIZADO' : 'IN PROD'
+        if (fields['Status']?.toUpperCase() !== publishStatus) continue
         if (fields[EXCLUDE_FIELD] === EXCLUDE_VALUE) continue
 
-        // Corte por Code Freeze: solo CF 29/06 en adelante (evita backfill del histórico).
-        if (!passesCutoff(issue.milestone?.title)) continue
+        // Corte por Code Freeze: solo roadmap (RAP no tiene milestone CF).
+        if (!isRap && !passesCutoff(issue.milestone?.title)) continue
 
-        // Fecha de puesta en producción: "In Prod At" (oficial) → cierre del issue → release.
-        const inProdDate =
-          fields['In Prod At'] || issue.closedAt || issue.milestone?.dueOn || null
+        // Fecha "En producción":
+        // - roadmap: "In Prod At" → cierre → release del milestone
+        // - RAP: cierre del issue (si está abierto, se estampa al crear)
+        const prodDate = isRap
+          ? issue.closedAt || null
+          : fields['In Prod At'] || issue.closedAt || issue.milestone?.dueOn || null
+
+        // Company ID: RAP tiene campo propio; roadmap se busca en body + comentarios.
+        const commentBodies = issue.comments?.nodes.map(n => n.body) ?? []
+        const companyId = isRap
+          ? firstObjectId(fields['Company ID'])
+          : extractCompanyId(issue.body, commentBodies)
 
         const meta: SyncMetadata = {
           id: issue.id,
@@ -184,10 +214,10 @@ export class GitHubDataSource implements DataSource {
           repo,
           producto: fields['Producto'],
           priority: fields['Priority'],
-          type: normalizeIssueType(issue.issueType?.name),
-          companyId: extractCompanyId(issue.body),
+          type: normalizeIssueType(issue.issueType?.name) || (isRap ? 'RAP' : null),
+          companyId,
           milestone: issue.milestone?.title,
-          milestoneDate: inProdDate,
+          milestoneDate: prodDate,
           githubStatus: fields['Status'],
         }
 
@@ -197,6 +227,9 @@ export class GitHubDataSource implements DataSource {
           continue
         }
 
+        // RAP sin fecha de cierre: estampamos la fecha en que lo vemos productizado.
+        const createdDate = prodDate || (isRap ? new Date().toISOString() : null)
+
         // Nueva: generamos el contenido con Groq (fallback al título del issue).
         // Ritmo entre llamadas para no pasarnos del límite de tokens/minuto de Groq.
         await new Promise(r => setTimeout(r, 900))
@@ -205,6 +238,7 @@ export class GitHubDataSource implements DataSource {
           isNew: true,
           data: {
             ...meta,
+            milestoneDate: createdDate,
             tituloAmigable: generated?.titulo || stripTag(issue.title) || `Issue #${issue.number}`,
             descripcionCliente: generated?.descripcion || null,
             aQuienAplica: generated?.aQuienAplica || null,

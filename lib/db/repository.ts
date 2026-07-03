@@ -173,7 +173,8 @@ export async function updateFeatureMeta(data: SyncMetadata): Promise<void> {
       type: data.type ?? null,
       companyId: data.companyId ?? null,
       milestone: data.milestone ?? null,
-      milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
+      // Si no hay fecha nueva, NO la pisamos (preserva la fecha estampada, ej. RAP abierto).
+      milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : undefined,
       githubStatus: data.githubStatus ?? null,
       syncedAt: new Date(),
     },
