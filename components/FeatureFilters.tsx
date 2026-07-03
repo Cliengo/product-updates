@@ -64,7 +64,7 @@ export default function FeatureFilters({ currentFilters, totalCount, releases }:
             else params.delete('q')
             router.replace(`/?${params.toString()}`)
           }}
-          className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 rounded-lg bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 rounded-lg bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
         />
       </div>
 
@@ -130,9 +130,9 @@ function SelectFilter({ label, value, onChange, options }: SelectFilterProps) {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className={`text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer ${
+      className={`text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer ${
         value
-          ? 'border-indigo-300 text-indigo-700 font-medium'
+          ? 'border-violet-300 text-violet-700 font-medium'
           : 'border-neutral-200 text-neutral-600'
       }`}
     >

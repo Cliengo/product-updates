@@ -53,7 +53,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
           <span className="text-sm text-neutral-700 font-medium truncate max-w-xs">{feature.tituloAmigable}</span>
           <Link
             href={`/features/${feature.id}/edit`}
-            className="ml-auto flex items-center gap-1.5 text-sm text-neutral-500 hover:text-indigo-700 transition-colors flex-shrink-0"
+            className="ml-auto flex items-center gap-1.5 text-sm text-neutral-500 hover:text-violet-700 transition-colors flex-shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -79,7 +79,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
             )}
           </div>
 
-          <h1 className="text-2xl font-bold text-neutral-900 mb-3">{feature.tituloAmigable}</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 mb-3">{feature.tituloAmigable}</h1>
 
           {feature.descripcionCliente && (
             <p className="text-neutral-600 leading-relaxed text-base">{feature.descripcionCliente}</p>
@@ -126,7 +126,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                             href={feature.videoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
+                            className="inline-flex items-center gap-1.5 text-sm text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-lg hover:bg-violet-100 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -140,7 +140,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                             href={feature.onePagerUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
+                            className="inline-flex items-center gap-1.5 text-sm text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-lg hover:bg-violet-100 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -183,7 +183,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                   href={feature.issueUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-indigo-700 hover:text-indigo-800 transition-colors"
+                  className="flex items-center gap-2 text-sm text-violet-700 hover:text-violet-800 transition-colors"
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />

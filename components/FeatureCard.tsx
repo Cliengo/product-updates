@@ -53,7 +53,7 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
 
           {/* Title */}
           <h2
-            className={`font-semibold text-neutral-900 leading-snug group-hover:text-indigo-700 transition-colors ${
+            className={`font-heading font-bold text-neutral-900 leading-snug group-hover:text-violet-700 transition-colors ${
               isDeprecated ? 'line-through text-neutral-500' : ''
             }`}
           >

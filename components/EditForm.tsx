@@ -10,7 +10,7 @@ interface EditFormProps {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none'
+  'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none'
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -129,7 +129,7 @@ export default function EditForm({ feature }: EditFormProps) {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
             >
               {saving ? 'Guardando…' : 'Guardar cambios'}
             </button>

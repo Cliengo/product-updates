@@ -31,13 +31,13 @@ export default async function LandingPage({ searchParams }: PageProps) {
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center flex-shrink-0">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-base font-semibold text-neutral-900 leading-tight">Product Updates</h1>
+              <h1 className="font-heading text-base font-bold text-neutral-900 leading-tight">Product Updates</h1>
               <p className="text-xs text-neutral-400">Cliengo · Uso interno</p>
             </div>
           </div>
@@ -45,10 +45,12 @@ export default async function LandingPage({ searchParams }: PageProps) {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-neutral-900 mb-1">Novedades del producto</h2>
-          <p className="text-neutral-500 text-sm">
-            Features lanzados, en beta y en desarrollo — con contexto, estado real y material para comunicar al cliente.
+        <div className="mb-8">
+          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-900 mb-2">
+            Novedades del producto
+          </h2>
+          <p className="text-neutral-500 text-base max-w-2xl">
+            Explorá los últimos lanzamientos de Cliengo: features, mejoras y fixes — con contexto, estado y material listo para comunicar al cliente.
           </p>
         </div>
 
