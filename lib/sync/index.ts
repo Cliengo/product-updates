@@ -52,6 +52,7 @@ export async function runSync(options: { reset?: boolean } = {}): Promise<{
             tipo: item.data.type,
             producto: item.data.producto,
             fecha: item.data.milestoneDate,
+            companyId: item.data.companyId,
           })
           if (ok) notified++
         }

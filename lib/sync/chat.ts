@@ -7,6 +7,7 @@ export interface ChatUpdate {
   tipo?: string | null
   producto?: string | null
   fecha?: string | null
+  companyId?: string | null
 }
 
 function formatDate(dateStr: string | null | undefined): string | null {
@@ -35,6 +36,9 @@ export async function postToChat(update: ChatUpdate): Promise<boolean> {
   const widgets: Record<string, unknown>[] = []
   if (update.descripcion) widgets.push({ textParagraph: { text: update.descripcion } })
   if (fecha) widgets.push({ decoratedText: { topLabel: 'En producción', text: fecha } })
+  if (update.companyId) {
+    widgets.push({ decoratedText: { topLabel: 'Company ID (cliente afectado)', text: `🏢 ${update.companyId}` } })
+  }
   if (url) {
     widgets.push({
       buttonList: {
