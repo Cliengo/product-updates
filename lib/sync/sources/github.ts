@@ -196,9 +196,9 @@ export class GitHubDataSource implements DataSource {
 
         // Fecha "En producción":
         // - roadmap: "In Prod At" → cierre → release del milestone
-        // - RAP: cierre del issue (si está abierto, se estampa al crear)
+        // - RAP: "Productizado At" (campo del board) → cierre → (estampa al crear)
         const prodDate = isRap
-          ? issue.closedAt || null
+          ? fields['Productizado At'] || issue.closedAt || null
           : fields['In Prod At'] || issue.closedAt || issue.milestone?.dueOn || null
 
         // Company ID: RAP tiene campo propio; roadmap se busca en body + comentarios.
