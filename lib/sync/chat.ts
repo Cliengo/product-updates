@@ -8,6 +8,7 @@ export interface ChatUpdate {
   producto?: string | null
   fecha?: string | null
   companyId?: string | null
+  issueUrl?: string | null
 }
 
 function formatDate(dateStr: string | null | undefined): string | null {
@@ -39,13 +40,12 @@ export async function postToChat(update: ChatUpdate): Promise<boolean> {
   if (update.companyId) {
     widgets.push({ decoratedText: { topLabel: 'Company ID (cliente afectado)', text: `🏢 ${update.companyId}` } })
   }
-  if (url) {
-    widgets.push({
-      buttonList: {
-        buttons: [{ text: 'Ver en el sitio', onClick: { openLink: { url } } }],
-      },
-    })
+  const buttons: Record<string, unknown>[] = []
+  if (url) buttons.push({ text: 'Ver en el sitio', onClick: { openLink: { url } } })
+  if (update.issueUrl) {
+    buttons.push({ text: 'Ver en GitHub', onClick: { openLink: { url: update.issueUrl } } })
   }
+  if (buttons.length) widgets.push({ buttonList: { buttons } })
 
   const body = {
     cardsV2: [
