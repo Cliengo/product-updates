@@ -27,8 +27,10 @@ export async function postToChat(update: ChatUpdate): Promise<boolean> {
   const webhook = process.env.CHAT_WEBHOOK_URL
   if (!webhook) return false
 
-  const base = (process.env.APP_URL || '').replace(/\/$/, '')
-  const url = base ? `${base}/features/${update.id}` : undefined
+  // APP_URL debería venir de la env de Vercel; si falta o queda vacío, caemos al
+  // dominio vivo para que el botón "Ver en el sitio" nunca desaparezca de la card.
+  const base = (process.env.APP_URL || 'https://cliengo-novedades.vercel.app').replace(/\/$/, '')
+  const url = `${base}/features/${update.id}`
 
   const tipoLabel = update.tipo ? TIPO_LABELS[update.tipo] ?? update.tipo : null
   const subtitle = [tipoLabel, update.producto].filter(Boolean).join(' · ')
