@@ -4,13 +4,37 @@ import {
   createFeature,
   updateFeatureMeta,
   deleteAllFeatures,
+  getFeatureByIssueNumber,
 } from '@/lib/db/repository'
 import { MockDataSource } from './sources/mock'
 import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
 import { postToChat } from './chat'
 
-export async function runSync(options: { reset?: boolean } = {}): Promise<{
+/**
+ * Postea al canal de Chat la card de UNA feature ya existente, por número de
+ * issue. Sirve para comunicar a mano una novedad puntual (ej. tras un backfill
+ * silencioso donde el resto no se notificó).
+ */
+export async function notifyIssue(
+  issueNumber: number
+): Promise<{ notified: boolean; error?: string }> {
+  const f = await getFeatureByIssueNumber(issueNumber)
+  if (!f) return { notified: false, error: `Feature del issue #${issueNumber} no encontrada` }
+  const ok = await postToChat({
+    id: f.id,
+    titulo: f.tituloAmigable,
+    descripcion: f.descripcionCliente,
+    tipo: f.type,
+    producto: f.producto,
+    fecha: f.milestoneDate,
+    companyId: f.companyId,
+    issueUrl: f.issueUrl,
+  })
+  return { notified: ok }
+}
+
+export async function runSync(options: { reset?: boolean; silent?: boolean } = {}): Promise<{
   created: number
   updated: number
   deleted: number
@@ -43,8 +67,9 @@ export async function runSync(options: { reset?: boolean } = {}): Promise<{
       if (item.isNew) {
         await createFeature(item.data)
         created++
-        // Aviso al canal de Google Chat (solo novedades reales, no en un reset masivo).
-        if (!options.reset) {
+        // Aviso al canal de Google Chat (solo novedades reales; no en reset masivo
+        // ni en un backfill silencioso).
+        if (!options.reset && !options.silent) {
           const ok = await postToChat({
             id: item.data.id,
             titulo: item.data.tituloAmigable,

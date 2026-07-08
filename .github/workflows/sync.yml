@@ -9,6 +9,14 @@ on:
         description: 'Borrar TODA la data antes de sincronizar (limpieza)'
         type: boolean
         default: false
+      silent:
+        description: 'Sincronizar sin avisar novedades al canal de Chat (backfill)'
+        type: boolean
+        default: false
+      notify:
+        description: 'Postear al Chat la card de UN issue puntual (nº de issue)'
+        type: string
+        default: ''
 
 jobs:
   sync:
@@ -17,9 +25,15 @@ jobs:
       - name: Call sync endpoint
         run: |
           URL="${{ secrets.APP_URL }}/api/sync"
-          if [ "${{ inputs.reset }}" = "true" ]; then
+          if [ -n "${{ inputs.notify }}" ]; then
+            URL="$URL?notify=${{ inputs.notify }}"
+            echo "Notify activado — se posteará al Chat solo el issue #${{ inputs.notify }}."
+          elif [ "${{ inputs.reset }}" = "true" ]; then
             URL="$URL?reset=1"
             echo "Reset activado — se borrará toda la data antes de sincronizar."
+          elif [ "${{ inputs.silent }}" = "true" ]; then
+            URL="$URL?silent=1"
+            echo "Silent activado — se sincroniza sin avisar al canal de Chat."
           fi
           resp=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}" \

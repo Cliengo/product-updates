@@ -81,6 +81,13 @@ export async function getFeatureById(id: string): Promise<FeatureData | null> {
   return deserialize(feature)
 }
 
+/** Busca una feature por el número de issue (para notificar una novedad puntual). */
+export async function getFeatureByIssueNumber(issueNumber: number): Promise<FeatureData | null> {
+  const feature = await prisma.feature.findFirst({ where: { issueNumber } })
+  if (!feature) return null
+  return deserialize(feature)
+}
+
 export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updatedAt' | 'syncedAt'>): Promise<void> {
   const payload = {
     issueNumber: data.issueNumber,

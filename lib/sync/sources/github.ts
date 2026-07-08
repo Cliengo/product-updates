@@ -11,6 +11,9 @@ import { passesCutoff } from '../cutoff'
 const EXCLUDE_FIELD = 'No comunicar'
 const EXCLUDE_VALUE = 'Sí'
 
+/** issueTypes nativos que nunca se publican (tareas internas). */
+const EXCLUDED_TYPES = ['task', 'tarea']
+
 interface ProjectItemsResponse {
   node: {
     items: {
@@ -185,14 +188,18 @@ export class GitHubDataSource implements DataSource {
           }
         }
 
-        // Estado que dispara la publicación: roadmap → IN PROD; RAP → Productizado.
+        // Estado que dispara la publicación: roadmap → IN PROD o ROLLED OUT (los
+        // dos estados de "lanzado"); RAP → Productizado. Aceptar ambos cierra el
+        // agujero de la transición rápida IN PROD → ROLLED OUT entre corridas del
+        // cron: la clave de dedup es el id del issue, así que no duplica.
         const isRap = repo === 'rap'
-        const publishStatus = isRap ? 'PRODUCTIZADO' : 'IN PROD'
-        if (fields['Status']?.toUpperCase() !== publishStatus) continue
+        const publishStatuses = isRap ? ['PRODUCTIZADO'] : ['IN PROD', 'ROLLED OUT']
+        if (!publishStatuses.includes(fields['Status']?.toUpperCase() ?? '')) continue
         if (fields[EXCLUDE_FIELD] === EXCLUDE_VALUE) continue
 
-        // Corte por Code Freeze: solo roadmap (RAP no tiene milestone CF).
-        if (!isRap && !passesCutoff(issue.milestone?.title)) continue
+        // Nunca publicar tareas internas (issueType nativo "Task"/"Tarea"):
+        // son trabajo operativo (crear configs, retroactividades), no novedades.
+        if (EXCLUDED_TYPES.includes((issue.issueType?.name ?? '').trim().toLowerCase())) continue
 
         // Fecha "En producción":
         // - roadmap: "In Prod At" → cierre → release del milestone
@@ -200,6 +207,10 @@ export class GitHubDataSource implements DataSource {
         const prodDate = isRap
           ? fields['Productizado At'] || issue.closedAt || null
           : fields['In Prod At'] || issue.closedAt || issue.milestone?.dueOn || null
+
+        // Corte por Code Freeze: solo roadmap. Con milestone CF válido se usa ese;
+        // sin milestone (típico en bugs) se cae a la fecha de prod para no perderlos.
+        if (!isRap && !passesCutoff(issue.milestone?.title, prodDate)) continue
 
         // Company ID: RAP tiene campo propio; roadmap se busca en body + comentarios.
         const commentBodies = issue.comments?.nodes.map(n => n.body) ?? []

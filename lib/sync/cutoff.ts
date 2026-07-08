@@ -39,11 +39,27 @@ export function parseCfDate(title: string | undefined | null, cutoffISO: string)
   return Date.UTC(year, month - 1, day)
 }
 
-/** true si el item (por su milestone) debe publicarse según el corte de CF. */
-export function passesCutoff(milestoneTitle: string | undefined | null): boolean {
+/**
+ * true si el item debe publicarse según el corte de CF.
+ *
+ * Prioridad: 1) fecha del milestone CF; 2) si no hay milestone CF válido (típico
+ * en bugs que salen a prod sin milestone), la fecha de producción (`fallbackISO`
+ * = In Prod At / closedAt). Los ítems previos al corte siguen excluidos, así que
+ * esto no reintroduce el histórico.
+ */
+export function passesCutoff(
+  milestoneTitle: string | undefined | null,
+  fallbackISO?: string | null
+): boolean {
   const cutoffISO = process.env.PUBLISH_CF_CUTOFF || DEFAULT_CUTOFF
-  const cf = parseCfDate(milestoneTitle, cutoffISO)
-  if (cf === null) return false
   const cutoff = new Date(cutoffISO + 'T00:00:00Z').getTime()
-  return cf >= cutoff
+
+  const cf = parseCfDate(milestoneTitle, cutoffISO)
+  if (cf !== null) return cf >= cutoff
+
+  if (fallbackISO) {
+    const d = new Date(fallbackISO).getTime()
+    if (!Number.isNaN(d)) return d >= cutoff
+  }
+  return false
 }
