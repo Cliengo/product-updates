@@ -1,5 +1,8 @@
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+// Groq apagó meta-llama/llama-4-scout-17b-16e-instruct el 17/07/2026; este es el
+// reemplazo que recomienda su doc de deprecaciones. Si se cambia, verificar que el
+// modelo soporte response_format json_object.
+const DEFAULT_MODEL = 'openai/gpt-oss-120b'
 const MAX_RETRIES = 4
 
 export interface GeneratedUpdate {
@@ -84,7 +87,7 @@ export async function generateProductUpdate(
       apiKey,
       JSON.stringify({
         model,
-        max_tokens: 600,
+        max_tokens: 1024,
         temperature: 0.3,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
