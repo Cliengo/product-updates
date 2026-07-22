@@ -1,5 +1,17 @@
 import { TIPO_LABELS } from '@/lib/types'
 
+/**
+ * Etiqueta compacta + emoji por tipo, para el TÍTULO de la card de Chat (donde
+ * se lee más grande que el subtítulo). Es intencionalmente más corta que
+ * TIPO_LABELS (que se usa en la ficha del sitio).
+ */
+const TIPO_TITULO: Record<string, { emoji: string; label: string }> = {
+  Story: { emoji: '✨', label: 'Novedad' },
+  'Bug Cliente': { emoji: '🔧', label: 'Fix' },
+  'Bug Producto': { emoji: '🔧', label: 'Fix' },
+  RAP: { emoji: '🛠️', label: 'Desarrollo a medida' },
+}
+
 export interface ChatUpdate {
   id: string
   titulo: string
@@ -32,8 +44,13 @@ export async function postToChat(update: ChatUpdate): Promise<boolean> {
   const base = (process.env.APP_URL || 'https://cliengo-novedades.vercel.app').replace(/\/$/, '')
   const url = `${base}/features/${update.id}`
 
-  const tipoLabel = update.tipo ? TIPO_LABELS[update.tipo] ?? update.tipo : null
-  const subtitle = [tipoLabel, update.producto].filter(Boolean).join(' · ')
+  // El tipo va en el TÍTULO (se lee más grande); el subtítulo queda para el producto.
+  const tipoTitulo = update.tipo ? TIPO_TITULO[update.tipo] : null
+  const emoji = tipoTitulo?.emoji ?? '📣'
+  const title = tipoTitulo
+    ? `${emoji} ${tipoTitulo.label}: ${update.titulo}`
+    : `${emoji} ${update.titulo}`
+  const subtitle = update.producto || (update.tipo ? TIPO_LABELS[update.tipo] ?? update.tipo : null)
   const fecha = formatDate(update.fecha)
 
   const widgets: Record<string, unknown>[] = []
@@ -55,7 +72,7 @@ export async function postToChat(update: ChatUpdate): Promise<boolean> {
         cardId: `product-update-${update.id}`,
         card: {
           header: {
-            title: `📣 ${update.titulo}`,
+            title,
             subtitle: subtitle || 'Novedad de producto',
           },
           sections: [{ widgets }],

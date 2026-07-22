@@ -47,7 +47,8 @@ async function groqFetch(apiKey: string, body: string): Promise<Response | null>
  */
 export async function generateProductUpdate(
   issueTitle: string,
-  issueBody: string
+  issueBody: string,
+  tipo?: string | null
 ): Promise<GeneratedUpdate | null> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) {
@@ -55,11 +56,18 @@ export async function generateProductUpdate(
     return null
   }
 
+  // Para fixes (bugs) la descripción es más clara contando el antes y el después;
+  // para features nuevas no hay un "antes", así que se describe qué aporta.
+  const esFix = tipo === 'Bug Cliente' || tipo === 'Bug Producto'
+  const descripcionRegla = esFix
+    ? '2. "descripcion": 2 oraciones cortas contando el antes y el después, con este formato exacto: "Antes, <qué pasaba / el problema>. Ahora, <qué sucede tras el arreglo>." Sin tecnicismos.'
+    : '2. "descripcion": 1 a 2 oraciones. Qué hace la funcionalidad y qué valor le da al cliente.'
+
   const model = process.env.GROQ_MODELO || DEFAULT_MODEL
   const prompt = [
     'Sos un asistente de Producto. Dado el siguiente issue técnico, generá en español, sin tecnicismos:',
     '1. "titulo": título amigable para equipos internos (Marketing, CS, Ventas). Máx 8 palabras.',
-    '2. "descripcion": 1 a 2 oraciones. Qué hace la funcionalidad y qué valor le da al cliente.',
+    descripcionRegla,
     '3. "aQuienAplica": a qué usuarios/planes aplica, inferido del contexto. Si no se puede inferir, poné "".',
     '4. "mensajeSugerido": mensaje corto y listo para que CS/Ventas le comunique al cliente.',
     '',
