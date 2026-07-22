@@ -214,6 +214,46 @@ export async function updateFeatureContent(id: string, data: EditableContent): P
   })
 }
 
+/**
+ * Features cuyo contenido generado por IA quedó sin descripción (típico cuando
+ * Groq falló y se cayó al fallback de solo-título). Para el backfill quirúrgico.
+ */
+export async function getFeaturesMissingDescription(): Promise<
+  { id: string; issueNumber: number; repo: string; type: string | null }[]
+> {
+  return prisma.feature.findMany({
+    where: { OR: [{ descripcionCliente: null }, { descripcionCliente: '' }] },
+    select: { id: true, issueNumber: true, repo: true, type: true },
+    orderBy: { milestoneDate: 'desc' },
+  })
+}
+
+/**
+ * Actualiza SOLO los campos generados por IA (título/descripción/a quién aplica/
+ * mensaje sugerido), sin tocar metadata, estado, captura ni flag. Usado por el
+ * backfill: el título solo se pisa si viene uno nuevo no vacío.
+ */
+export async function updateFeatureGenerated(
+  id: string,
+  data: {
+    tituloAmigable?: string
+    descripcionCliente: string
+    aQuienAplica?: string | null
+    mensajeSugerido?: string | null
+  }
+): Promise<void> {
+  await prisma.feature.update({
+    where: { id },
+    data: {
+      ...(data.tituloAmigable ? { tituloAmigable: data.tituloAmigable } : {}),
+      descripcionCliente: data.descripcionCliente,
+      aQuienAplica: data.aQuienAplica ?? null,
+      mensajeSugerido: data.mensajeSugerido ?? null,
+      syncedAt: new Date(),
+    },
+  })
+}
+
 /** Borra todas las features (usado por el reset del sync). */
 export async function deleteAllFeatures(): Promise<number> {
   const res = await prisma.feature.deleteMany({})

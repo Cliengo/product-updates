@@ -5,11 +5,63 @@ import {
   updateFeatureMeta,
   deleteAllFeatures,
   getFeatureByIssueNumber,
+  getFeaturesMissingDescription,
+  updateFeatureGenerated,
 } from '@/lib/db/repository'
 import { MockDataSource } from './sources/mock'
 import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
 import { postToChat } from './chat'
+import { generateProductUpdate } from './groq'
+
+/**
+ * Backfill quirúrgico: regenera con IA SOLO las features que quedaron sin
+ * descripción (p. ej. las creadas mientras Groq estaba caído). No toca el resto,
+ * no pisa metadata/estado/captura y NUNCA avisa al canal de Chat.
+ */
+export async function backfillDescriptions(): Promise<{
+  found: number
+  regenerated: number
+  failed: string[]
+}> {
+  if (process.env.DATA_SOURCE !== 'github') {
+    return { found: 0, regenerated: 0, failed: ['DATA_SOURCE no es github'] }
+  }
+  await ensureSchema()
+  const source = new GitHubDataSource(process.env.GITHUB_TOKEN!)
+  const missing = await getFeaturesMissingDescription()
+
+  const failed: string[] = []
+  let regenerated = 0
+  for (const f of missing) {
+    try {
+      const content = await source.getIssueContent(f.id)
+      if (!content) {
+        failed.push(`#${f.issueNumber}: issue no encontrado en GitHub`)
+        continue
+      }
+      // Mismo ritmo que en el create para no pasarnos del rate limit de Groq.
+      await new Promise(r => setTimeout(r, 900))
+      const gen = await generateProductUpdate(content.title, content.body, f.type)
+      if (!gen || !gen.descripcion) {
+        failed.push(`#${f.issueNumber}: Groq no devolvió descripción`)
+        continue
+      }
+      await updateFeatureGenerated(f.id, {
+        tituloAmigable: gen.titulo || undefined,
+        descripcionCliente: gen.descripcion,
+        aQuienAplica: gen.aQuienAplica || null,
+        mensajeSugerido: gen.mensajeSugerido || null,
+      })
+      regenerated++
+    } catch (err) {
+      failed.push(`#${f.issueNumber}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  console.log(`[backfill] ${regenerated}/${missing.length} regeneradas, ${failed.length} fallidas`)
+  return { found: missing.length, regenerated, failed }
+}
 
 /**
  * Postea al canal de Chat la card de UNA feature ya existente, por número de

@@ -86,6 +86,25 @@ export class GitHubDataSource implements DataSource {
     this.org = org
   }
 
+  /**
+   * Título y cuerpo de un issue por su node id (para regenerar contenido de una
+   * feature existente sin volver a recorrer todo el Project). Null si no existe.
+   */
+  async getIssueContent(nodeId: string): Promise<{ title: string; body: string } | null> {
+    const QUERY = `
+      query($id: ID!) {
+        node(id: $id) {
+          ... on Issue { title body }
+        }
+      }
+    `
+    const data = await this.graphql<{ node: { title?: string; body?: string } | null }>(QUERY, {
+      id: nodeId,
+    })
+    if (!data.node) return null
+    return { title: data.node.title ?? '', body: data.node.body ?? '' }
+  }
+
   async getFeatures(existingIds: Set<string>): Promise<SyncItem[]> {
     const [roadmap, rap] = await Promise.all([
       this.fetchFromProject('roadmap', existingIds),

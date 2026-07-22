@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { runSync, notifyIssue } from '@/lib/sync'
+import { runSync, notifyIssue, backfillDescriptions } from '@/lib/sync'
 
 // El sync genera muchos items con IA (con pausas por rate limit) → necesita margen.
 export const maxDuration = 300
@@ -18,10 +18,16 @@ export async function POST(request: Request) {
   const silent = params.get('silent') === '1'
   // ?notify=<nº issue> postea al Chat la card de UNA feature ya existente.
   const notify = params.get('notify')
+  // ?regen=missing regenera con IA solo las features sin descripción (backfill).
+  const regen = params.get('regen') === 'missing'
 
   try {
     if (notify) {
       const result = await notifyIssue(Number(notify))
+      return NextResponse.json(result)
+    }
+    if (regen) {
+      const result = await backfillDescriptions()
       return NextResponse.json(result)
     }
     const result = await runSync({ reset, silent })
