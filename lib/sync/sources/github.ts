@@ -5,14 +5,37 @@ import { generateProductUpdate } from '../groq'
 import { passesCutoff } from '../cutoff'
 
 /**
- * Campo single-select del Project. Todo lo que llega a IN PROD se publica;
- * el equipo marca "No comunicar = Sí" en el board (antes de IN PROD) para excluir.
+ * Campo single-select del Project que deja un item afuera. Todo lo que llega a
+ * IN PROD se publica; el equipo marca el campo en el board (antes de IN PROD)
+ * para excluir algo puntual.
+ *
+ * Se aceptan varios pares campo/valor: el nuevo ("Difusión = No comunicar") y el
+ * viejo ("No comunicar = Sí"). Así renombrar el campo en el board no apaga la
+ * exclusión en silencio y manda trabajo interno al canal de ~50 personas.
  */
-const EXCLUDE_FIELD = 'No comunicar'
-const EXCLUDE_VALUE = 'Sí'
+const EXCLUDE_RULES = [
+  { field: 'difusion', value: 'no comunicar' },
+  { field: 'no comunicar', value: 'si' },
+]
 
 /** issueTypes nativos que nunca se publican (tareas internas). */
 const EXCLUDED_TYPES = ['task', 'tarea']
+
+/** Para comparar nombres/valores del board: sin acentos, sin espacios de más, minúsculas. */
+function norm(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase()
+}
+
+/** ¿El board marcó este item como "no comunicar"? */
+function isExcluded(fields: Record<string, string>): boolean {
+  return Object.entries(fields).some(([name, value]) =>
+    EXCLUDE_RULES.some(r => r.field === norm(name) && r.value === norm(value))
+  )
+}
 
 interface ProjectItemsResponse {
   node: {
@@ -81,6 +104,13 @@ export class GitHubDataSource implements DataSource {
   private token: string
   private org: string
 
+  /**
+   * Cuántos items lanzados quedaron afuera en la última corrida y por qué.
+   * Se expone para que el sync lo devuelva: excluir es una decisión que conviene
+   * ver en el log del workflow, no que pase invisible.
+   */
+  skipped = { excluded: 0, tasks: 0 }
+
   constructor(token: string, org = 'cliengo') {
     this.token = token
     this.org = org
@@ -106,10 +136,14 @@ export class GitHubDataSource implements DataSource {
   }
 
   async getFeatures(existingIds: Set<string>): Promise<SyncItem[]> {
+    this.skipped = { excluded: 0, tasks: 0 }
     const [roadmap, rap] = await Promise.all([
       this.fetchFromProject('roadmap', existingIds),
       this.fetchFromProject('rap', existingIds),
     ])
+    console.log(
+      `[github] Salteados: ${this.skipped.excluded} marcados "no comunicar", ${this.skipped.tasks} de tipo Task`
+    )
     return [...roadmap, ...rap]
   }
 
@@ -214,11 +248,17 @@ export class GitHubDataSource implements DataSource {
         const isRap = repo === 'rap'
         const publishStatuses = isRap ? ['PRODUCTIZADO'] : ['IN PROD', 'ROLLED OUT']
         if (!publishStatuses.includes(fields['Status']?.toUpperCase() ?? '')) continue
-        if (fields[EXCLUDE_FIELD] === EXCLUDE_VALUE) continue
+        if (isExcluded(fields)) {
+          this.skipped.excluded++
+          continue
+        }
 
         // Nunca publicar tareas internas (issueType nativo "Task"/"Tarea"):
         // son trabajo operativo (crear configs, retroactividades), no novedades.
-        if (EXCLUDED_TYPES.includes((issue.issueType?.name ?? '').trim().toLowerCase())) continue
+        if (EXCLUDED_TYPES.includes(norm(issue.issueType?.name ?? ''))) {
+          this.skipped.tasks++
+          continue
+        }
 
         // Fecha "En producción":
         // - roadmap: "In Prod At" → cierre → release del milestone

@@ -91,6 +91,7 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
   updated: number
   deleted: number
   notified: number
+  skipped: { excluded: number; tasks: number }
   errors: string[]
 }> {
   const source: DataSource =
@@ -108,6 +109,7 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
 
   const existingIds = await getExistingIds()
   const items = await source.getFeatures(existingIds)
+  const skipped = source.skipped ?? { excluded: 0, tasks: 0 }
 
   const errors: string[] = []
   let created = 0
@@ -146,7 +148,8 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
   }
 
   console.log(
-    `[sync] Done: ${created} creadas, ${updated} actualizadas, ${notified} avisadas a Chat, ${errors.length} errores`
+    `[sync] Done: ${created} creadas, ${updated} actualizadas, ${notified} avisadas a Chat, ` +
+      `${skipped.excluded} no comunicadas, ${skipped.tasks} tareas, ${errors.length} errores`
   )
-  return { created, updated, deleted, notified, errors }
+  return { created, updated, deleted, notified, skipped, errors }
 }

@@ -4,6 +4,8 @@ import mockData from '@/data/mock-features.json'
 
 export interface DataSource {
   getFeatures(existingIds: Set<string>): Promise<SyncItem[]>
+  /** Items lanzados que la fuente dejó afuera a propósito (se reporta en el sync). */
+  skipped?: { excluded: number; tasks: number }
 }
 
 export class MockDataSource implements DataSource {
