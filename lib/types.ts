@@ -7,6 +7,43 @@ export type EstadoDisponibilidad =
   | 'en-desarrollo'
   | 'deprecated'
 
+/**
+ * Alcance del lanzamiento, DERIVADO del Status del board (no se edita a mano):
+ * - `parcial`: el issue está IN PROD → ya está subido a producción, pero puede
+ *   no estar activo para todas las cuentas (flag, rollout progresivo, piloto).
+ * - `todos`: ROLLED OUT (roadmap) o Productizado (RAP) → lo tienen todos.
+ * Es distinto de `estadoDisponibilidad`, que se edita a mano en el sitio.
+ */
+export type Disponibilidad = 'parcial' | 'todos'
+
+/** Status del board que significan "lanzado". El sync guarda el texto tal cual viene. */
+const STATUS_TODOS = ['rolled out', 'productizado']
+const STATUS_PARCIAL = ['in prod']
+
+/** Traduce el Status crudo del board a `Disponibilidad`. Null si no reconoce el estado. */
+export function disponibilidadFromStatus(
+  githubStatus: string | null | undefined
+): Disponibilidad | null {
+  const s = (githubStatus ?? '').trim().toLowerCase()
+  if (!s) return null
+  if (STATUS_TODOS.includes(s)) return 'todos'
+  if (STATUS_PARCIAL.includes(s)) return 'parcial'
+  return null
+}
+
+export const DISPONIBILIDAD_LABELS: Record<Disponibilidad, string> = {
+  parcial: 'Rollout parcial',
+  todos: 'Disponible para todos',
+}
+
+export const DISPONIBILIDAD_TOOLTIPS: Record<Disponibilidad, string> = {
+  parcial:
+    'Ya está subido a producción, pero puede no estar activo para todas las cuentas todavía.',
+  todos: 'Terminó el rollout: lo tienen todas las cuentas.',
+}
+
+export const DISPONIBILIDADES = ['todos', 'parcial'] as const satisfies Disponibilidad[]
+
 export type TipoIssue = 'Story' | 'Bug Cliente' | 'Bug Producto' | 'RAP'
 export type Priority = 'Alta' | 'Media' | 'Baja'
 
@@ -27,6 +64,8 @@ export interface FeatureData {
   milestone?: string | null
   milestoneDate?: string | null
   githubStatus?: string | null
+  disponibilidad?: Disponibilidad | null
+  rolledOutAt?: string | null
   tituloAmigable: string
   descripcionCliente?: string | null
   featureFlag?: string | null

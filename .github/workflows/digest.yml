@@ -1,0 +1,39 @@
+name: Resumen semanal de rollouts
+
+# Un único mensaje al canal de Chat con las novedades que terminaron su rollout
+# (pasaron de "en producción / parcial" a "disponible para todos") en la semana.
+# Las cards individuales se editan en silencio durante el sync horario; este
+# resumen es el único aviso activo de ese cambio.
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # lunes 12:00 UTC = 9:00 ART
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Ventana en días (default 7)'
+        type: string
+        default: '7'
+      dry:
+        description: 'Solo listar lo que entraría, sin postear al canal'
+        type: boolean
+        default: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call digest endpoint
+        run: |
+          DAYS="${{ inputs.days }}"
+          URL="${{ secrets.APP_URL }}/api/digest?days=${DAYS:-7}"
+          if [ "${{ inputs.dry }}" = "true" ]; then
+            URL="$URL&dry=1"
+            echo "Dry-run — no se postea nada al canal."
+          fi
+          resp=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}" \
+            -H "Content-Type: application/json")
+          echo "Resultado del resumen: $resp"
+          code=$(echo "$resp" | tail -1)
+          if [ "$code" != "200" ]; then echo "Digest falló (HTTP $code)"; exit 1; fi

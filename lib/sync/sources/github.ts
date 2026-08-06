@@ -1,6 +1,6 @@
 import type { DataSource } from './mock'
 import type { SyncItem, SyncMetadata } from '../types'
-import { normalizeIssueType } from '@/lib/types'
+import { normalizeIssueType, disponibilidadFromStatus } from '@/lib/types'
 import { generateProductUpdate } from '../groq'
 import { passesCutoff } from '../cutoff'
 
@@ -289,6 +289,9 @@ export class GitHubDataSource implements DataSource {
           milestone: issue.milestone?.title,
           milestoneDate: prodDate,
           githubStatus: fields['Status'],
+          // IN PROD = está en prod pero puede no estar activo para todas las cuentas;
+          // ROLLED OUT / Productizado = lo tienen todos. Se recalcula en cada sync.
+          disponibilidad: disponibilidadFromStatus(fields['Status']),
         }
 
         // Existente: solo actualizamos metadatos, nunca regeneramos ni pisamos ediciones.

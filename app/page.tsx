@@ -6,6 +6,7 @@ import FeatureFilters from '@/components/FeatureFilters'
 interface PageProps {
   searchParams: Promise<{
     estado?: string
+    disponibilidad?: string
     producto?: string
     priority?: string
     tipo?: string
@@ -18,6 +19,7 @@ export default async function LandingPage({ searchParams }: PageProps) {
   const params = await searchParams
   const filters: FilterParams = {
     estado: params.estado,
+    disponibilidad: params.disponibilidad,
     producto: params.producto,
     priority: params.priority,
     tipo: params.tipo,

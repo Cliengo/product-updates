@@ -20,6 +20,8 @@ model Feature {
   milestone            String?
   milestoneDate        DateTime?
   githubStatus         String?
+  disponibilidad       String?
+  rolledOutAt          DateTime?
 
   tituloAmigable       String
   descripcionCliente   String?

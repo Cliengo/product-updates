@@ -1,4 +1,4 @@
-import type { FeatureData } from '@/lib/types'
+import type { Disponibilidad, FeatureData } from '@/lib/types'
 
 /**
  * Metadatos que vienen de GitHub y se actualizan en CADA sync (no son editables
@@ -16,6 +16,8 @@ export interface SyncMetadata {
   milestone?: string | null
   milestoneDate?: string | null
   githubStatus?: string | null
+  /** Derivado del Status del board: 'parcial' (IN PROD) o 'todos' (ROLLED OUT/Productizado). */
+  disponibilidad?: Disponibilidad | null
 }
 
 /** Feature nueva: metadatos + contenido generado por IA (se crea una sola vez). */

@@ -1,17 +1,18 @@
 import {
   ensureSchema,
-  getExistingIds,
+  getExistingMeta,
   createFeature,
   updateFeatureMeta,
   deleteAllFeatures,
   getFeatureByIssueNumber,
   getFeaturesMissingDescription,
   updateFeatureGenerated,
+  getRolledOutSince,
 } from '@/lib/db/repository'
 import { MockDataSource } from './sources/mock'
 import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
-import { postToChat } from './chat'
+import { postToChat, postWeeklyDigest } from './chat'
 import { generateProductUpdate } from './groq'
 
 /**
@@ -82,6 +83,7 @@ export async function notifyIssue(
     fecha: f.milestoneDate,
     companyId: f.companyId,
     issueUrl: f.issueUrl,
+    disponibilidad: f.disponibilidad,
   })
   return { notified: ok }
 }
@@ -91,6 +93,8 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
   updated: number
   deleted: number
   notified: number
+  /** Features que pasaron de "rollout parcial" a "disponible para todos" en esta corrida. */
+  promoted: number
   skipped: { excluded: number; tasks: number }
   errors: string[]
 }> {
@@ -107,8 +111,10 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
     console.log(`[sync] reset: ${deleted} features borradas`)
   }
 
-  const existingIds = await getExistingIds()
-  const items = await source.getFeatures(existingIds)
+  // Estado previo de cada feature: sirve para saber cuáles son nuevas y para
+  // detectar el cambio de alcance (rollout parcial → disponible para todos).
+  const existing = await getExistingMeta()
+  const items = await source.getFeatures(new Set(existing.keys()))
   const skipped = source.skipped ?? { excluded: 0, tasks: 0 }
 
   const errors: string[] = []
@@ -116,6 +122,7 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
   let updated = 0
 
   let notified = 0
+  let promoted = 0
   for (const item of items) {
     try {
       if (item.isNew) {
@@ -133,12 +140,39 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
             fecha: item.data.milestoneDate,
             companyId: item.data.companyId,
             issueUrl: item.data.issueUrl,
+            disponibilidad: item.data.disponibilidad,
           })
           if (ok) notified++
         }
       } else {
-        await updateFeatureMeta(item.data)
+        const prev = existing.get(item.data.id)
+        const ahora = item.data.disponibilidad ?? null
+        const antes = prev?.disponibilidad ?? null
+
+        // Transición real: estaba en rollout parcial y ahora lo tienen todos.
+        const esPromocion = antes === 'parcial' && ahora === 'todos'
+        // Primera vez que vemos el alcance de una feature vieja (la columna se
+        // llenó recién): estampamos la fecha de prod como aproximación, sin
+        // tratarlo como novedad (no edita cards ni entra al resumen semanal).
+        const esBackfill = antes === null && ahora === 'todos' && !prev?.rolledOutAt
+
+        let rolledOutAt: Date | undefined
+        if (esPromocion) rolledOutAt = new Date()
+        else if (esBackfill) {
+          rolledOutAt = item.data.milestoneDate ? new Date(item.data.milestoneDate) : new Date()
+        }
+
+        await updateFeatureMeta(item.data, { rolledOutAt })
         updated++
+
+        // El sitio se actualiza solo (lee `disponibilidad`); al canal no se le
+        // avisa acá: el aviso es el resumen semanal, que agrupa todo en un mensaje.
+        if (esPromocion) {
+          promoted++
+          console.log(
+            `[sync] #${item.data.issueNumber} pasó a disponible para todos: ${prev?.tituloAmigable ?? ''}`
+          )
+        }
       }
     } catch (err) {
       const msg = `#${item.data.issueNumber}: ${err instanceof Error ? err.message : String(err)}`
@@ -149,7 +183,41 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
 
   console.log(
     `[sync] Done: ${created} creadas, ${updated} actualizadas, ${notified} avisadas a Chat, ` +
+      `${promoted} pasaron a disponible para todos, ` +
       `${skipped.excluded} no comunicadas, ${skipped.tasks} tareas, ${errors.length} errores`
   )
-  return { created, updated, deleted, notified, skipped, errors }
+  return { created, updated, deleted, notified, promoted, skipped, errors }
+}
+
+/**
+ * Resumen SEMANAL al canal: un único mensaje con todo lo que pasó a estar
+ * disponible para todos en los últimos `days` días. Es el único aviso de este
+ * cambio (las cards individuales se editan en silencio, y Chat no re-notifica
+ * una edición). Si no hubo nada, no postea.
+ */
+export async function runWeeklyDigest(
+  options: { days?: number; dry?: boolean } = {}
+): Promise<{ found: number; posted: number; dry: boolean; items: string[] }> {
+  const days = options.days ?? 7
+  const hasta = new Date()
+  const desde = new Date(hasta.getTime() - days * 24 * 60 * 60 * 1000)
+
+  await ensureSchema()
+  const features = await getRolledOutSince(desde)
+  const items = features.map(f => ({
+    id: f.id,
+    titulo: f.tituloAmigable,
+    tipo: f.type,
+    producto: f.producto,
+    rolledOutAt: f.rolledOutAt,
+  }))
+
+  if (options.dry) {
+    console.log(`[digest] dry-run: ${items.length} features en los últimos ${days} días`)
+    return { found: items.length, posted: 0, dry: true, items: items.map(i => i.titulo) }
+  }
+
+  const { posted } = await postWeeklyDigest(items, { desde, hasta })
+  console.log(`[digest] ${items.length} encontradas, ${posted} posteadas al canal`)
+  return { found: items.length, posted, dry: false, items: items.map(i => i.titulo) }
 }

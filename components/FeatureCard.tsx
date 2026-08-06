@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { FeatureData } from '@/lib/types'
 import StatusBadge from './StatusBadge'
+import AvailabilityBadge from './AvailabilityBadge'
 import TypeBadge from './TypeBadge'
 import PriorityBadge from './PriorityBadge'
 import AssetIndicators from './AssetIndicators'
@@ -40,6 +41,8 @@ export default function FeatureCard({ feature }: FeatureCardProps) {
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               {feature.type && <TypeBadge type={feature.type} />}
+              {/* Alcance real del lanzamiento, derivado del Status de GitHub. */}
+              <AvailabilityBadge disponibilidad={feature.disponibilidad} />
               {/* El estado solo se muestra si NO es "Disponible" (beta, deprecado, etc.) */}
               {feature.estadoDisponibilidad !== 'rolled-out' && (
                 <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} />

@@ -2,12 +2,22 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
-import { ESTADOS, PRODUCTOS, PRIORIDADES, TIPOS, ESTADO_LABELS, TIPO_LABELS } from '@/lib/types'
+import {
+  ESTADOS,
+  PRODUCTOS,
+  PRIORIDADES,
+  TIPOS,
+  ESTADO_LABELS,
+  TIPO_LABELS,
+  DISPONIBILIDADES,
+  DISPONIBILIDAD_LABELS,
+} from '@/lib/types'
 import type { EstadoDisponibilidad } from '@/lib/types'
 
 interface FeatureFiltersProps {
   currentFilters: {
     estado?: string
+    disponibilidad?: string
     producto?: string
     priority?: string
     tipo?: string
@@ -75,6 +85,12 @@ export default function FeatureFilters({ currentFilters, totalCount, releases }:
           value={currentFilters.estado ?? ''}
           onChange={v => updateFilter('estado', v)}
           options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e as EstadoDisponibilidad] }))}
+        />
+        <SelectFilter
+          label="Disponibilidad"
+          value={currentFilters.disponibilidad ?? ''}
+          onChange={v => updateFilter('disponibilidad', v)}
+          options={DISPONIBILIDADES.map(d => ({ value: d, label: DISPONIBILIDAD_LABELS[d] }))}
         />
         <SelectFilter
           label="Producto"

@@ -2,11 +2,16 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getFeatureById } from '@/lib/db/repository'
 import StatusBadge from '@/components/StatusBadge'
+import AvailabilityBadge from '@/components/AvailabilityBadge'
 import TypeBadge from '@/components/TypeBadge'
 import PriorityBadge from '@/components/PriorityBadge'
 import CopyButton from '@/components/CopyButton'
 import { imageSrc, releaseLabel } from '@/lib/utils'
-import type { EstadoDisponibilidad } from '@/lib/types'
+import {
+  DISPONIBILIDAD_LABELS,
+  DISPONIBILIDAD_TOOLTIPS,
+  type EstadoDisponibilidad,
+} from '@/lib/types'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -68,6 +73,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
         <div className="bg-white rounded-xl border border-neutral-200 p-8">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {feature.type && <TypeBadge type={feature.type} />}
+            <AvailabilityBadge disponibilidad={feature.disponibilidad} size="md" />
             {feature.estadoDisponibilidad !== 'rolled-out' && (
               <StatusBadge estado={feature.estadoDisponibilidad as EstadoDisponibilidad} size="md" />
             )}
@@ -83,6 +89,14 @@ export default async function FeatureDetailPage({ params }: PageProps) {
 
           {feature.descripcionCliente && (
             <p className="text-neutral-600 leading-relaxed text-base">{feature.descripcionCliente}</p>
+          )}
+
+          {/* El tooltip del badge no se ve en mobile: la aclaración va también acá. */}
+          {feature.disponibilidad === 'parcial' && (
+            <p className="mt-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              {DISPONIBILIDAD_TOOLTIPS.parcial} Cuando el rollout termine, esta ficha se
+              actualiza sola.
+            </p>
           )}
         </div>
 
@@ -171,6 +185,15 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                 )}
                 <StatRow label="Aplica a" value={feature.aQuienAplica} />
                 <StatRow label="En producción" value={formatDate(feature.milestoneDate)} />
+                <StatRow
+                  label="Alcance"
+                  value={
+                    feature.disponibilidad ? DISPONIBILIDAD_LABELS[feature.disponibilidad] : null
+                  }
+                />
+                {feature.rolledOutAt && (
+                  <StatRow label="Para todos desde" value={formatDate(feature.rolledOutAt)} />
+                )}
                 <StatRow label="Release" value={releaseLabel(feature.milestone, feature.milestoneDate)} />
                 <StatRow label="Repositorio" value={feature.repo === 'roadmap' ? 'Roadmap' : 'RAP'} />
               </dl>

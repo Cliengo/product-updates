@@ -1,6 +1,6 @@
 import { prisma } from './prisma'
 import type { Prisma } from '../../app/generated/prisma/client'
-import type { FeatureData, FaqItem, EstadoDisponibilidad } from '@/lib/types'
+import type { FeatureData, FaqItem, EstadoDisponibilidad, Disponibilidad } from '@/lib/types'
 import type { NewFeatureData, SyncMetadata } from '@/lib/sync/types'
 import { parseCfDate } from '@/lib/sync/cutoff'
 import { releaseLabel } from '@/lib/utils'
@@ -10,6 +10,8 @@ function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>):
   return {
     ...raw,
     milestoneDate: raw.milestoneDate?.toISOString() ?? null,
+    rolledOutAt: raw.rolledOutAt?.toISOString() ?? null,
+    disponibilidad: (raw.disponibilidad as Disponibilidad | null) ?? null,
     createdAt: raw.createdAt.toISOString(),
     updatedAt: raw.updatedAt.toISOString(),
     syncedAt: raw.syncedAt.toISOString(),
@@ -21,6 +23,7 @@ function deserialize(raw: Awaited<ReturnType<typeof prisma.feature.findFirst>>):
 
 export interface FeatureFilters {
   estado?: string
+  disponibilidad?: string
   producto?: string
   priority?: string
   tipo?: string
@@ -32,6 +35,7 @@ export async function getFeatures(filters: FeatureFilters): Promise<FeatureData[
   const where: Prisma.FeatureWhereInput = {}
 
   if (filters.estado) where.estadoDisponibilidad = filters.estado
+  if (filters.disponibilidad) where.disponibilidad = filters.disponibilidad
   if (filters.producto) where.producto = filters.producto
   if (filters.priority) where.priority = filters.priority
   if (filters.tipo) where.type = filters.tipo
@@ -129,15 +133,48 @@ export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updat
  * Evita depender de `prisma db push` en el build (riesgoso con conexiones pooled).
  */
 export async function ensureSchema(): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    'ALTER TABLE "Feature" ADD COLUMN IF NOT EXISTS "companyId" TEXT'
+  const columns = ['"companyId" TEXT', '"disponibilidad" TEXT', '"rolledOutAt" TIMESTAMP(3)']
+  for (const col of columns) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Feature" ADD COLUMN IF NOT EXISTS ${col}`)
+  }
+}
+
+export interface ExistingMeta {
+  disponibilidad: Disponibilidad | null
+  rolledOutAt: Date | null
+  tituloAmigable: string
+}
+
+/**
+ * Estado guardado de cada feature ANTES de esta corrida, para detectar la
+ * transición "rollout parcial → disponible para todos" (IN PROD → ROLLED OUT).
+ */
+export async function getExistingMeta(): Promise<Map<string, ExistingMeta>> {
+  const rows = await prisma.feature.findMany({
+    select: { id: true, disponibilidad: true, rolledOutAt: true, tituloAmigable: true },
+  })
+  return new Map(
+    rows.map(r => [
+      r.id,
+      {
+        disponibilidad: (r.disponibilidad as Disponibilidad | null) ?? null,
+        rolledOutAt: r.rolledOutAt ?? null,
+        tituloAmigable: r.tituloAmigable,
+      },
+    ])
   )
 }
 
-/** IDs de todas las features ya persistidas (para saber cuáles son nuevas en el sync). */
-export async function getExistingIds(): Promise<Set<string>> {
-  const rows = await prisma.feature.findMany({ select: { id: true } })
-  return new Set(rows.map(r => r.id))
+/**
+ * Features que pasaron a "disponible para todos" desde una fecha (para el resumen
+ * semanal al canal). Ordenadas de la más vieja a la más nueva.
+ */
+export async function getRolledOutSince(since: Date): Promise<FeatureData[]> {
+  const rows = await prisma.feature.findMany({
+    where: { rolledOutAt: { gte: since } },
+    orderBy: { rolledOutAt: 'asc' },
+  })
+  return rows.map(r => deserialize(r))
 }
 
 /** Crea una feature nueva con el contenido generado por IA. Idempotente por id. */
@@ -153,6 +190,14 @@ export async function createFeature(data: NewFeatureData): Promise<void> {
     milestone: data.milestone ?? null,
     milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : null,
     githubStatus: data.githubStatus ?? null,
+    disponibilidad: data.disponibilidad ?? null,
+    // Si nace ya ROLLED OUT, el rollout terminó junto con la puesta en producción.
+    rolledOutAt:
+      data.disponibilidad === 'todos'
+        ? data.milestoneDate
+          ? new Date(data.milestoneDate)
+          : new Date()
+        : null,
     tituloAmigable: data.tituloAmigable,
     descripcionCliente: data.descripcionCliente ?? null,
     aQuienAplica: data.aQuienAplica ?? null,
@@ -169,8 +214,15 @@ export async function createFeature(data: NewFeatureData): Promise<void> {
   })
 }
 
-/** Actualiza SOLO los metadatos que vienen de GitHub. Nunca pisa el texto editado. */
-export async function updateFeatureMeta(data: SyncMetadata): Promise<void> {
+/**
+ * Actualiza SOLO los metadatos que vienen de GitHub. Nunca pisa el texto editado.
+ * `rolledOutAt` solo se escribe si el sync detectó el cambio de alcance (si no,
+ * se deja como está: puede haber sido corregido a mano).
+ */
+export async function updateFeatureMeta(
+  data: SyncMetadata,
+  opts: { rolledOutAt?: Date } = {}
+): Promise<void> {
   await prisma.feature.update({
     where: { id: data.id },
     data: {
@@ -183,6 +235,8 @@ export async function updateFeatureMeta(data: SyncMetadata): Promise<void> {
       // Si no hay fecha nueva, NO la pisamos (preserva la fecha estampada, ej. RAP abierto).
       milestoneDate: data.milestoneDate ? new Date(data.milestoneDate) : undefined,
       githubStatus: data.githubStatus ?? null,
+      disponibilidad: data.disponibilidad ?? null,
+      rolledOutAt: opts.rolledOutAt ?? undefined,
       syncedAt: new Date(),
     },
   })
