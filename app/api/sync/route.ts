@@ -18,8 +18,9 @@ export async function POST(request: Request) {
   const silent = params.get('silent') === '1'
   // ?notify=<nº issue> postea al Chat la card de UNA feature ya existente.
   const notify = params.get('notify')
-  // ?regen=missing regenera con IA solo las features sin descripción (backfill).
-  const regen = params.get('regen') === 'missing'
+  // ?regen=missing regenera con IA las features sin descripción (backfill);
+  // ?regen=<nº issue> regenera esa sola, incluso si ya tiene descripción.
+  const regen = params.get('regen')
 
   try {
     if (notify) {
@@ -27,7 +28,10 @@ export async function POST(request: Request) {
       return NextResponse.json(result)
     }
     if (regen) {
-      const result = await backfillDescriptions()
+      const soloUno = Number(regen)
+      const result = await backfillDescriptions(
+        Number.isInteger(soloUno) && soloUno > 0 ? soloUno : undefined
+      )
       return NextResponse.json(result)
     }
     const result = await runSync({ reset, silent })

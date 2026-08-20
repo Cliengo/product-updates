@@ -37,8 +37,12 @@ const PROMO_SILENCIOSA_HASTA = new Date('2026-08-23T00:00:00Z')
  * Backfill quirúrgico: regenera con IA SOLO las features que quedaron sin
  * descripción (p. ej. las creadas mientras Groq estaba caído). No toca el resto,
  * no pisa metadata/estado/captura y NUNCA avisa al canal de Chat.
+ *
+ * Con `issueNumber` regenera esa feature aunque YA tenga descripción: sirve para
+ * corregir un texto que salió mal (ej. un fix con el eje "Antes/Ahora" invertido)
+ * sin editarlo a mano en el sitio.
  */
-export async function backfillDescriptions(): Promise<{
+export async function backfillDescriptions(issueNumber?: number): Promise<{
   found: number
   regenerated: number
   failed: string[]
@@ -48,7 +52,14 @@ export async function backfillDescriptions(): Promise<{
   }
   await ensureSchema()
   const source = new GitHubDataSource(process.env.GITHUB_TOKEN!)
-  const missing = await getFeaturesMissingDescription()
+  let missing: { id: string; issueNumber: number; repo: string; type: string | null }[]
+  if (issueNumber) {
+    const f = await getFeatureByIssueNumber(issueNumber)
+    if (!f) return { found: 0, regenerated: 0, failed: [`#${issueNumber} no está en el sitio`] }
+    missing = [{ id: f.id, issueNumber: f.issueNumber, repo: f.repo, type: f.type ?? null }]
+  } else {
+    missing = await getFeaturesMissingDescription()
+  }
 
   const failed: string[] = []
   let regenerated = 0

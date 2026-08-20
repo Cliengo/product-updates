@@ -18,9 +18,9 @@ on:
         type: string
         default: ''
       regen:
-        description: 'Regenerar con IA solo los items SIN descripción (backfill, no avisa al Chat)'
-        type: boolean
-        default: false
+        description: 'Regenerar descripciones con IA: "missing" (todas las vacías) o un nº de issue (esa sola, aunque ya tenga texto)'
+        type: string
+        default: ''
 
 jobs:
   sync:
@@ -38,9 +38,9 @@ jobs:
           elif [ "${{ inputs.silent }}" = "true" ]; then
             URL="$URL?silent=1"
             echo "Silent activado — se sincroniza sin avisar al canal de Chat."
-          elif [ "${{ inputs.regen }}" = "true" ]; then
-            URL="$URL?regen=missing"
-            echo "Regen activado — se regeneran solo los items sin descripción."
+          elif [ -n "${{ inputs.regen }}" ]; then
+            URL="$URL?regen=${{ inputs.regen }}"
+            echo "Regen activado (${{ inputs.regen }}) — no avisa al canal de Chat."
           fi
           resp=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.SYNC_SECRET_TOKEN }}" \
