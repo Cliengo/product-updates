@@ -16,6 +16,24 @@ import { postToChat, postWeeklyDigest } from './chat'
 import { generateProductUpdate } from './groq'
 
 /**
+ * Ventana de promocion silenciosa (one-time, agosto 2026).
+ *
+ * Al automatizar el pase de los Bug cliente de IN PROD a ROLLED OUT en el board
+ * quedaron 55 bugs viejos para mover de golpe. Sin esto, el sync los leeria como
+ * 55 promociones del dia y el resumen del lunes los listaria a todos.
+ *
+ * Mientras estemos antes de esta fecha, una promocion NO estampa `rolledOutAt`:
+ * el sitio los muestra igual como disponibles para todos (eso lo maneja
+ * `disponibilidad`), pero al no tener fecha quedan fuera de la ventana del
+ * resumen semanal. No se les inventa una fecha porque no sabemos cuando pasaron
+ * a estar disponibles para todas las cuentas.
+ *
+ * Es a prueba de carreras: no importa que corrida del cron horario los agarre.
+ * Se desactiva sola al pasar la fecha, no hay que volver a tocar nada.
+ */
+const PROMO_SILENCIOSA_HASTA = new Date('2026-08-23T00:00:00Z')
+
+/**
  * Backfill quirúrgico: regenera con IA SOLO las features que quedaron sin
  * descripción (p. ej. las creadas mientras Groq estaba caído). No toca el resto,
  * no pisa metadata/estado/captura y NUNCA avisa al canal de Chat.
@@ -156,8 +174,12 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
         // tratarlo como novedad (no edita cards ni entra al resumen semanal).
         const esBackfill = antes === null && ahora === 'todos' && !prev?.rolledOutAt
 
+        // Ver PROMO_SILENCIOSA_HASTA: durante la ventana la promocion no estampa
+        // fecha, asi que no entra al resumen semanal.
+        const promoSilenciosa = esPromocion && new Date() < PROMO_SILENCIOSA_HASTA
+
         let rolledOutAt: Date | undefined
-        if (esPromocion) rolledOutAt = new Date()
+        if (esPromocion && !promoSilenciosa) rolledOutAt = new Date()
         else if (esBackfill) {
           rolledOutAt = item.data.milestoneDate ? new Date(item.data.milestoneDate) : new Date()
         }
@@ -170,7 +192,7 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
         if (esPromocion) {
           promoted++
           console.log(
-            `[sync] #${item.data.issueNumber} pasó a disponible para todos: ${prev?.tituloAmigable ?? ''}`
+            `[sync] #${item.data.issueNumber} pasó a disponible para todos${promoSilenciosa ? ' (silencioso: no entra al resumen)' : ''}: ${prev?.tituloAmigable ?? ''}`
           )
         }
       }
