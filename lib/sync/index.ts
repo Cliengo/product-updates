@@ -14,6 +14,7 @@ import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
 import { postToChat, postWeeklyDigest } from './chat'
 import { generateProductUpdate } from './groq'
+import { avisaAlCanal } from '@/lib/types'
 
 /**
  * Ventana de promocion silenciosa (one-time, agosto 2026).
@@ -97,6 +98,11 @@ export async function backfillDescriptions(issueNumber?: number): Promise<{
  * Postea al canal de Chat la card de UNA feature ya existente, por número de
  * issue. Sirve para comunicar a mano una novedad puntual (ej. tras un backfill
  * silencioso donde el resto no se notificó).
+ *
+ * A proposito NO respeta `avisaAlCanal`: es la valvula de escape manual. Si un
+ * Bug Producto puntual amerita avisarse (uno grave, uno que Soporte venia
+ * pateando), se postea con `?notify=<nº>`. La regla automatica saca el ruido,
+ * no la posibilidad de comunicar.
  */
 export async function notifyIssue(
   issueNumber: number
@@ -158,8 +164,8 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
         await createFeature(item.data)
         created++
         // Aviso al canal de Google Chat (solo novedades reales; no en reset masivo
-        // ni en un backfill silencioso).
-        if (!options.reset && !options.silent) {
+        // ni en un backfill silencioso, y nunca los tipos que no van al canal).
+        if (!options.reset && !options.silent && avisaAlCanal(item.data.type)) {
           const ok = await postToChat({
             id: item.data.id,
             titulo: item.data.tituloAmigable,
@@ -187,7 +193,16 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
 
         // Ver PROMO_SILENCIOSA_HASTA: durante la ventana la promocion no estampa
         // fecha, asi que no entra al resumen semanal.
-        const promoSilenciosa = esPromocion && new Date() < PROMO_SILENCIOSA_HASTA
+        //
+        // Los tipos que no van al canal tampoco estampan fecha, pero por otro
+        // motivo: para un bug, IN PROD y ROLLED OUT significan lo mismo (sale
+        // arreglado para todas las cuentas de una), asi que "termino su rollout"
+        // no es un hito real y `new Date()` seria una fecha inventada — sobre
+        // todo en el backfill, donde 137 bugs viejos quedarian con la fecha de
+        // hoy. Sin dato, la ficha oculta "Para todos desde"; el alcance en el
+        // sitio lo maneja igual `disponibilidad`, que se deriva del Status.
+        const promoSilenciosa =
+          esPromocion && (new Date() < PROMO_SILENCIOSA_HASTA || !avisaAlCanal(item.data.type))
 
         let rolledOutAt: Date | undefined
         if (esPromocion && !promoSilenciosa) rolledOutAt = new Date()
@@ -236,7 +251,12 @@ export async function runWeeklyDigest(
   const desde = new Date(hasta.getTime() - days * 24 * 60 * 60 * 1000)
 
   await ensureSchema()
-  const features = await getRolledOutSince(desde)
+  // Segundo filtro, a proposito redundante con el de arriba: una feature que
+  // NACE ya en ROLLED OUT recibe `rolledOutAt` en createFeature (la fecha real de
+  // produccion, no inventada), asi que nunca paso por el camino de promocion y
+  // igual caeria en la ventana de 7 dias. Este es el que garantiza que el tipo
+  // no llegue al canal.
+  const features = (await getRolledOutSince(desde)).filter(f => avisaAlCanal(f.type))
   const items = features.map(f => ({
     id: f.id,
     titulo: f.tituloAmigable,

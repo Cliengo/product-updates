@@ -113,6 +113,33 @@ export function normalizeIssueType(raw: string | null | undefined): string | nul
   }
 }
 
+/**
+ * Tipos que NUNCA se avisan al canal de Google Chat: ni la card individual del
+ * dia que salen, ni el resumen semanal del lunes. Se siguen publicando en el
+ * sitio con normalidad — esto es una regla de canal, no de visibilidad.
+ *
+ * `Bug Producto` (definicion de agosto 2026): son correcciones internas que el
+ * equipo detecta y arregla. Son ~10-15 por semana, muchas mas que las features,
+ * asi que al canal lo unico que le aportan es ruido: tapan las novedades reales
+ * en un resumen que corta en 15 items. Quien las quiera ver, las tiene en el
+ * sitio con su filtro de tipo.
+ *
+ * OJO: esto NO es lo mismo que `Difusion = No comunicar` en el board, que saca
+ * al issue del sitio tambien.
+ */
+const TIPOS_SIN_CHAT = ['bug producto']
+
+/**
+ * Se compara normalizado (trim + lowercase) y no por igualdad exacta a proposito:
+ * el issueType nativo llega con capitalizacion variable segun quien lo cargo, y
+ * un match exacto apagaria la regla EN SILENCIO mandando bugs al canal de ~50
+ * personas. Mismo criterio que `EXCLUDE_RULES` en sources/github.ts.
+ */
+export function avisaAlCanal(type: string | null | undefined): boolean {
+  if (!type) return true
+  return !TIPOS_SIN_CHAT.includes(type.trim().toLowerCase())
+}
+
 export const ESTADO_LABELS: Record<EstadoDisponibilidad, string> = {
   'rolled-out': 'Disponible',
   flag: 'Feature flag',
