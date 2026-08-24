@@ -4,6 +4,24 @@ import { normalizeIssueType, disponibilidadFromStatus } from '@/lib/types'
 import { generateProductUpdate } from '../groq'
 import { passesCutoff } from '../cutoff'
 
+const MAX_REINTENTOS_GH = 3
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/** Backoff exponencial con tope, respetando `retry-after` si GitHub lo manda. */
+async function esperarAntesDeReintentar(
+  intento: number,
+  retryAfter: string | null,
+  motivo: string
+): Promise<void> {
+  const segundos = Number(retryAfter)
+  const waitMs = Math.min(segundos > 0 ? segundos * 1000 : 2000 * 2 ** intento, 8000)
+  console.warn(
+    `[github] ${motivo}, reintento ${intento + 1}/${MAX_REINTENTOS_GH} en ${waitMs}ms`
+  )
+  await sleep(waitMs)
+}
+
+
 /**
  * Campo single-select del Project que deja un item afuera. Todo lo que llega a
  * IN PROD se publica; el equipo marca el campo en el board (antes de IN PROD)
@@ -147,19 +165,66 @@ export class GitHubDataSource implements DataSource {
     return [...roadmap, ...rap]
   }
 
+  /**
+   * Reintentos ante errores transitorios de la API de GitHub.
+   *
+   * La API tira 502/503 esporadicos y sin esto un solo blip mata la corrida
+   * entera: `/api/sync` devuelve 500 y el workflow queda en rojo. Con el cron
+   * horario se cura solo en la corrida siguiente, pero si el blip cae justo
+   * antes del digest del lunes, el resumen de esa semana sale incompleto.
+   * Es el mismo `withRetry` que ya tienen los workflows del board.
+   *
+   * Se reintenta SOLO lo transitorio a nivel transporte: 5xx, 429, errores de
+   * red, y 403 unicamente si trae `retry-after` (asi lo marca GitHub el rate
+   * limit secundario; un 403 pelado es token invalido y reintentarlo no sirve).
+   * Los `errors` del body de GraphQL NO se reintentan: son errores logicos de
+   * la query y volverian a fallar igual.
+   *
+   * Es seguro porque todas las llamadas de este archivo son queries de lectura.
+   * Si algun dia se agrega una mutation, revisar la idempotencia antes de que
+   * pase por aca.
+   *
+   * Los topes (4 intentos, espera <= 8s) estan atados al `maxDuration = 300` de
+   * /api/sync: en el peor caso una llamada suma ~14s, que entra holgado incluso
+   * sumado al ritmo de 900ms entre llamadas a Groq.
+   */
   private async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    const res = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query, variables }),
-    })
-    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
-    const json = await res.json()
-    if (json.errors) throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`)
-    return json.data
+    let ultimoError = ''
+
+    for (let intento = 0; intento <= MAX_REINTENTOS_GH; intento++) {
+      let res: Response
+      try {
+        res = await fetch('https://api.github.com/graphql', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query, variables }),
+        })
+      } catch (err) {
+        // Error de red (ECONNRESET, socket hang up, DNS): tambien es transitorio.
+        ultimoError = err instanceof Error ? err.message : String(err)
+        if (intento === MAX_REINTENTOS_GH) break
+        await esperarAntesDeReintentar(intento, null, ultimoError)
+        continue
+      }
+
+      if (res.ok) {
+        const json = await res.json()
+        if (json.errors) throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`)
+        return json.data
+      }
+
+      const retryAfter = res.headers.get('retry-after')
+      const transitorio = res.status >= 500 || res.status === 429 || (res.status === 403 && retryAfter)
+      ultimoError = `GitHub API error: ${res.status}`
+      if (!transitorio || intento === MAX_REINTENTOS_GH) throw new Error(ultimoError)
+
+      await esperarAntesDeReintentar(intento, retryAfter, String(res.status))
+    }
+
+    throw new Error(`GitHub API error: ${ultimoError}`)
   }
 
   private async fetchFromProject(
