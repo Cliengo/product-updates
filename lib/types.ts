@@ -31,6 +31,42 @@ export function disponibilidadFromStatus(
   return null
 }
 
+/**
+ * Valores del campo `Alcance` del board que significan "lo tienen todos".
+ * `Retirado` = el flag se archivo, o sea que el codigo ya no depende de el.
+ */
+const ALCANCE_TODOS = ['todos', 'retirado']
+
+/**
+ * Disponibilidad real: el Status da el alcance en grueso, pero el campo `Alcance`
+ * —que escribe flag-sync leyendo el targeting de LaunchDarkly— lo sabe de verdad.
+ *
+ * El Alcance SOLO PUEDE BAJAR la disponibilidad, nunca subirla:
+ *
+ * - Status dice `todos` y el flag sirve a 5 cuentas -> `parcial`. Esto es lo que
+ *   arregla el problema real: al 04/09/2026 habia items en ROLLED OUT mostrando
+ *   "Disponible para todos - lo tienen todas las cuentas" con el flag sirviendo a
+ *   nadie o a un punado de cuentas.
+ * - Status dice `parcial` y el flag ya sirve a todos -> se queda en `parcial`. El
+ *   flag esta al 100% pero entre IN PROD y ROLLED OUT todavia falta el QA, asi que
+ *   subirlo seria cambiar una afirmacion falsa por otra. Que la tarjeta no se haya
+ *   movido es una divergencia que resuelve la curadora, no este sitio.
+ *
+ * Sin `Alcance` (el 98% de los items, porque no tienen flag vinculado) se comporta
+ * exactamente como antes.
+ */
+export function disponibilidadReal(
+  githubStatus: string | null | undefined,
+  alcance: string | null | undefined
+): Disponibilidad | null {
+  const base = disponibilidadFromStatus(githubStatus)
+  if (!base) return null
+  const a = (alcance ?? '').trim().toLowerCase()
+  if (!a) return base
+  if (ALCANCE_TODOS.includes(a)) return base
+  return 'parcial'
+}
+
 export const DISPONIBILIDAD_LABELS: Record<Disponibilidad, string> = {
   parcial: 'Rollout parcial',
   todos: 'Disponible para todos',

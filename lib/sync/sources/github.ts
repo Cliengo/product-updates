@@ -1,6 +1,6 @@
 import type { DataSource } from './mock'
 import type { SyncItem, SyncMetadata } from '../types'
-import { normalizeIssueType, disponibilidadFromStatus } from '@/lib/types'
+import { normalizeIssueType, disponibilidadReal } from '@/lib/types'
 import { generateProductUpdate } from '../groq'
 import { passesCutoff } from '../cutoff'
 
@@ -248,7 +248,7 @@ export class GitHubDataSource implements DataSource {
             items(first: 100, after: $cursor) {
               pageInfo { hasNextPage endCursor }
               nodes {
-                fieldValues(first: 30) {
+                fieldValues(first: 50) {
                   nodes {
                     ... on ProjectV2ItemFieldSingleSelectValue {
                       name
@@ -356,7 +356,9 @@ export class GitHubDataSource implements DataSource {
           githubStatus: fields['Status'],
           // IN PROD = está en prod pero puede no estar activo para todas las cuentas;
           // ROLLED OUT / Productizado = lo tienen todos. Se recalcula en cada sync.
-          disponibilidad: disponibilidadFromStatus(fields['Status']),
+          // El campo `Alcance` (lo escribe flag-sync desde LaunchDarkly) puede BAJAR
+          // esto a `parcial` cuando el flag contradice al Status; nunca lo sube.
+          disponibilidad: disponibilidadReal(fields['Status'], fields['Alcance']),
         }
 
         // Existente: solo actualizamos metadatos, nunca regeneramos ni pisamos ediciones.

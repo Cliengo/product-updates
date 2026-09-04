@@ -191,7 +191,11 @@ export default async function FeatureDetailPage({ params }: PageProps) {
                     feature.disponibilidad ? DISPONIBILIDAD_LABELS[feature.disponibilidad] : null
                   }
                 />
-                {feature.rolledOutAt && (
+                {/* Solo si HOY lo tienen todos: el label está en presente. Un item con
+                    rolledOutAt viejo puede haber vuelto a `parcial` porque su flag no
+                    sirve a todas las cuentas, y ahí "Para todos desde" contradiría al
+                    badge de disponibilidad. */}
+                {feature.rolledOutAt && feature.disponibilidad === 'todos' && (
                   <StatRow label="Para todos desde" value={formatDate(feature.rolledOutAt)} />
                 )}
                 <StatRow label="Release" value={releaseLabel(feature.milestone, feature.milestoneDate)} />
