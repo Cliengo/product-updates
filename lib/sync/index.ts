@@ -205,7 +205,18 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
           esPromocion && (new Date() < PROMO_SILENCIOSA_HASTA || !avisaAlCanal(item.data.type))
 
         let rolledOutAt: Date | undefined
-        if (esPromocion && !promoSilenciosa) rolledOutAt = new Date()
+        if (esPromocion && !promoSilenciosa) {
+          // La fecha del BOARD antes que la de hoy. Una promoción no siempre significa
+          // que el rollout terminó recién: también salta cuando mejora nuestra LECTURA
+          // del alcance. Pasó el 04/09/2026 con #1258, un kill switch que se había
+          // leído mal como rollout a medias: al corregirlo volvió a `todos` y con
+          // `new Date()` habría entrado al resumen del lunes anunciando como novedad
+          // algo que terminó su rollout en julio. Cuando el board ya sabe la fecha,
+          // esa es la verdad; `new Date()` queda solo para cuando no la sabe.
+          rolledOutAt = item.data.rolledOutAtBoard
+            ? new Date(item.data.rolledOutAtBoard)
+            : new Date()
+        }
         else if (esBackfill) {
           rolledOutAt = item.data.milestoneDate ? new Date(item.data.milestoneDate) : new Date()
         }

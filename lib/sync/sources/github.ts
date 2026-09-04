@@ -359,6 +359,7 @@ export class GitHubDataSource implements DataSource {
           // El campo `Alcance` (lo escribe flag-sync desde LaunchDarkly) puede BAJAR
           // esto a `parcial` cuando el flag contradice al Status; nunca lo sube.
           disponibilidad: disponibilidadReal(fields['Status'], fields['Alcance']),
+          rolledOutAtBoard: (isRap ? fields['Productizado At'] : fields['Rolled Out At']) ?? null,
         }
 
         // Existente: solo actualizamos metadatos, nunca regeneramos ni pisamos ediciones.

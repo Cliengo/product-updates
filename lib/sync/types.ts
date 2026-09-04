@@ -18,6 +18,12 @@ export interface SyncMetadata {
   githubStatus?: string | null
   /** Derivado del Status del board: 'parcial' (IN PROD) o 'todos' (ROLLED OUT/Productizado). */
   disponibilidad?: Disponibilidad | null
+  /**
+   * "Rolled Out At" del board (o "Productizado At" en RAP): cuándo terminó el rollout
+   * según GitHub. Se usa al estampar una promoción en vez de la fecha de hoy — ver
+   * el comentario en `index.ts`.
+   */
+  rolledOutAtBoard?: string | null
 }
 
 /** Feature nueva: metadatos + contenido generado por IA (se crea una sola vez). */
