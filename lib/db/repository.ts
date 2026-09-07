@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import type { Prisma } from '../../app/generated/prisma/client'
 import type { FeatureData, FaqItem, EstadoDisponibilidad, Disponibilidad } from '@/lib/types'
 import type { NewFeatureData, SyncMetadata } from '@/lib/sync/types'
+import { fechasACalzar, type DeliveryInput } from '@/lib/delivery'
 import { parseCfDate } from '@/lib/sync/cutoff'
 import { releaseLabel } from '@/lib/utils'
 
@@ -133,7 +134,13 @@ export async function upsertFeature(data: Omit<FeatureData, 'createdAt' | 'updat
  * Evita depender de `prisma db push` en el build (riesgoso con conexiones pooled).
  */
 export async function ensureSchema(): Promise<void> {
-  const columns = ['"companyId" TEXT', '"disponibilidad" TEXT', '"rolledOutAt" TIMESTAMP(3)']
+  const columns = [
+    '"companyId" TEXT',
+    '"disponibilidad" TEXT',
+    '"rolledOutAt" TIMESTAMP(3)',
+    '"instructivoAt" TIMESTAMP(3)',
+    '"materialAt" TIMESTAMP(3)',
+  ]
   for (const col of columns) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Feature" ADD COLUMN IF NOT EXISTS ${col}`)
   }
@@ -177,6 +184,59 @@ export async function getRolledOutSince(since: Date): Promise<FeatureData[]> {
   return rows.map(r => deserialize(r))
 }
 
+export interface DeliveryRow {
+  id: string
+  issueNumber: number
+  issueUrl: string
+  repo: string
+  type: string | null
+  producto: string | null
+  githubStatus: string | null
+  disponibilidad: string | null
+  milestone: string | null
+  tituloAmigable: string
+  descripcionCliente: string | null
+  aQuienAplica: string | null
+  mensajeSugerido: string | null
+  onePagerUrl: string | null
+  videoUrl: string | null
+  screenshotsUrl: string | null
+  planMinimo: string | null
+  instructivoAt: Date | null
+  materialAt: Date | null
+}
+
+/**
+ * Filas para la solapa Delivery. Trae solo lo que necesitan los requisitos, no la
+ * feature entera: la descripcion completa y el FAQ no se muestran en la tabla.
+ */
+export async function getDeliveryRows(): Promise<DeliveryRow[]> {
+  return prisma.feature.findMany({
+    select: {
+      id: true,
+      issueNumber: true,
+      issueUrl: true,
+      repo: true,
+      type: true,
+      producto: true,
+      githubStatus: true,
+      disponibilidad: true,
+      milestone: true,
+      tituloAmigable: true,
+      descripcionCliente: true,
+      aQuienAplica: true,
+      mensajeSugerido: true,
+      onePagerUrl: true,
+      videoUrl: true,
+      screenshotsUrl: true,
+      planMinimo: true,
+      instructivoAt: true,
+      materialAt: true,
+    },
+    orderBy: [{ milestoneDate: 'desc' }, { issueNumber: 'desc' }],
+  })
+}
+
 /** Crea una feature nueva con el contenido generado por IA. Idempotente por id. */
 export async function createFeature(data: NewFeatureData): Promise<void> {
   const payload = {
@@ -205,6 +265,8 @@ export async function createFeature(data: NewFeatureData): Promise<void> {
     featureFlag: data.featureFlag ?? null,
     screenshotsUrl: data.screenshotsUrl ?? null,
     estadoDisponibilidad: data.estadoDisponibilidad,
+    // Si nace con un requisito ya cumplido, este ES el momento en que se cumplio.
+    ...fechasACalzar(null, data as DeliveryInput),
     syncedAt: new Date(),
   }
   await prisma.feature.upsert({
@@ -254,6 +316,26 @@ export interface EditableContent {
 
 /** Guarda las ediciones hechas a mano en el admin. */
 export async function updateFeatureContent(id: string, data: EditableContent): Promise<void> {
+  // Se lee el estado anterior para poder estampar la fecha SOLO cuando un requisito
+  // pasa de pendiente a cumplido. Sin esta comparacion, la primera edicion de una
+  // feature que ya estaba completa le pondria la fecha de hoy, que es la misma
+  // contaminacion que tienen las fechas del backfill del 21-22/08/2026 en el board.
+  const antes = await prisma.feature.findUnique({
+    where: { id },
+    select: {
+      type: true,
+      producto: true,
+      tituloAmigable: true,
+      descripcionCliente: true,
+      aQuienAplica: true,
+      mensajeSugerido: true,
+      screenshotsUrl: true,
+      onePagerUrl: true,
+      videoUrl: true,
+    },
+  })
+  const ahora: DeliveryInput = { ...(antes ?? { tituloAmigable: data.tituloAmigable }), ...data }
+
   await prisma.feature.update({
     where: { id },
     data: {
@@ -264,6 +346,7 @@ export async function updateFeatureContent(id: string, data: EditableContent): P
       featureFlag: data.featureFlag ?? null,
       screenshotsUrl: data.screenshotsUrl ?? null,
       estadoDisponibilidad: data.estadoDisponibilidad,
+      ...fechasACalzar(antes as DeliveryInput | null, ahora),
     },
   })
 }

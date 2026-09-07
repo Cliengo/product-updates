@@ -36,6 +36,11 @@ model Feature {
   faq                  String?
   notasInternas        String?
 
+  // Cuando vimos cumplido cada requisito (solapa Delivery). Se estampa en la
+  // transicion no->si, nunca retroactivo: ver `fechasACalzar` en lib/delivery.ts.
+  instructivoAt        DateTime?
+  materialAt           DateTime?
+
   rawComment           String?
   parseErrors          String?
 
