@@ -134,6 +134,9 @@ export default async function DeliveryPage({ searchParams }: PageProps) {
                   <Th>
                     Chargebee <Nota>sugerido</Nota>
                   </Th>
+                  <Th>
+                    <span className="sr-only">Acción</span>
+                  </Th>
                 </tr>
               </thead>
               <tbody>
@@ -172,6 +175,26 @@ export default async function DeliveryPage({ searchParams }: PageProps) {
                     <Celda req={req.instructivo} />
                     <Celda req={req.material} />
                     <Celda req={req.chargebee} />
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {/* Una lista de pendientes desde la que no se puede accionar es un
+                          informe. El link va DIRECTO al formulario de edicion, no a la
+                          ficha: desde la ficha habria que encontrar el boton Editar. */}
+                      {req.pendientes > 0 ? (
+                        <Link
+                          href={`/features/${row.id}/edit`}
+                          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
+                        >
+                          Completar
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/features/${row.id}`}
+                          className="text-xs font-medium text-neutral-400 hover:text-neutral-700"
+                        >
+                          Ver
+                        </Link>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -193,9 +216,13 @@ export default async function DeliveryPage({ searchParams }: PageProps) {
             título — no es un dato que alguien haya cargado.
           </p>
           <p>
-            Los requisitos se completan editando la feature (botón <em>Editar</em> en su ficha). Las
-            fechas indican desde cuándo lo vemos cumplido: las que se cumplieron antes de que
-            empezáramos a medir no tienen fecha.
+            <strong>Para completar hace falta la clave de edición</strong>, que es distinta de la de
+            esta sección: el botón <em>Completar</em> abre el formulario y pide esa clave al guardar.
+            Si vas a llenar material, pedila al equipo de Producto.
+          </p>
+          <p>
+            Las fechas indican desde cuándo lo vemos cumplido. Lo que ya estaba completo antes de que
+            empezáramos a medir no tiene fecha.
           </p>
         </div>
       </main>
