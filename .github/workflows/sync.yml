@@ -2,7 +2,12 @@ name: Sync Product Updates
 
 on:
   schedule:
-    - cron: '0 * * * *'  # cada hora
+    # Horario UTC (ART = UTC-3). El sync compara el board contra la DB, así que
+    # fuera de horario alcanza cada 3 h. Los lunes la corrida de las 11:00 deja
+    # todo al día antes del resumen semanal (digest.yml, 12:00 UTC).
+    - cron: '0 11-23 * * 1-5'     # lun-vie 08-20 ART: cada hora
+    - cron: '0 0,3,6,9 * * 1-5'   # lun-vie de noche: cada 3 h
+    - cron: '0 */3 * * 0,6'       # fin de semana: cada 3 h
   workflow_dispatch:       # permite correrlo manualmente desde GitHub
     inputs:
       reset:
