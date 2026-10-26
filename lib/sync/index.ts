@@ -295,6 +295,8 @@ export async function runWeeklyDigest(
     titulo: f.tituloAmigable,
     tipo: f.type,
     producto: f.producto,
+    issueNumber: f.issueNumber,
+    issueUrl: f.issueUrl,
   }))
 
   const titulos = (l: { titulo: string }[]) => l.map(i => i.titulo)

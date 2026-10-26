@@ -183,6 +183,8 @@ export interface DigestItem {
   tipo?: string | null
   producto?: string | null
   rolledOutAt?: string | Date | null
+  issueNumber?: number | null
+  issueUrl?: string | null
 }
 
 /**
@@ -288,11 +290,18 @@ export async function postFixesDigest(
     month: 'short',
   })} al ${periodo.hasta.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`
 
-  const MAX = 15
+  const MAX = 20
   const visibles = items.slice(0, MAX)
   const lineas = visibles.map(item => {
     const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
-    return `• <a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
+    // El numero del issue va adelante y lleva a GitHub: es como se nombran los
+    // bugs en la reunion. El titulo sigue llevando a la ficha del sitio.
+    const numero = item.issueNumber
+      ? item.issueUrl
+        ? `<a href="${item.issueUrl}">#${item.issueNumber}</a> `
+        : `#${item.issueNumber} `
+      : ''
+    return `• ${numero}<a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
   })
   if (items.length > visibles.length) {
     lineas.push(`<i>…y ${items.length - visibles.length} más en el sitio.</i>`)
