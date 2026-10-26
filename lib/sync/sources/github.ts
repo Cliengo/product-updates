@@ -320,7 +320,8 @@ export class GitHubDataSource implements DataSource {
 
         // Nunca publicar tareas internas (issueType nativo "Task"/"Tarea"):
         // son trabajo operativo (crear configs, retroactividades), no novedades.
-        if (EXCLUDED_TYPES.includes(norm(issue.issueType?.name ?? ''))) {
+        // No aplica a RAP: ahi el issueType nativo no significa nada (ver `type`).
+        if (!isRap && EXCLUDED_TYPES.includes(norm(issue.issueType?.name ?? ''))) {
           this.skipped.tasks++
           continue
         }
@@ -349,7 +350,10 @@ export class GitHubDataSource implements DataSource {
           repo,
           producto: fields['Producto'],
           priority: fields['Priority'],
-          type: normalizeIssueType(issue.issueType?.name) || (isRap ? 'RAP' : null),
+          // Todo lo del board de RAP es RAP, tenga el issueType nativo que tenga: a
+          // quien carga un RAP no se le pide Type, y cuando lo pone es al azar
+          // (#247 tenia Story y salia como Novedad; #2112 tenia Task y no salia).
+          type: isRap ? 'RAP' : normalizeIssueType(issue.issueType?.name),
           companyId,
           milestone: issue.milestone?.title,
           milestoneDate: prodDate,

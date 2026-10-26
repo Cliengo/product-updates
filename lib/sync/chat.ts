@@ -202,44 +202,59 @@ export async function postWeeklyDigest(
     month: 'short',
   })} al ${periodo.hasta.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`
 
-  const MAX = 15
-  const visibles = items.slice(0, MAX)
-
-  const widgets: Record<string, unknown>[] = [
-    {
-      textParagraph: {
-        text:
-          `Estas novedades terminaron su rollout: <b>ya las tienen todas las cuentas</b>. ` +
-          `Antes estaban en producción con disponibilidad parcial.`,
+  const intro = {
+    widgets: [
+      {
+        textParagraph: {
+          text:
+            `Esto terminó su rollout: <b>ya lo tienen todas las cuentas</b>. ` +
+            `Antes estaba en producción con disponibilidad parcial.`,
+        },
       },
-    },
-  ]
-
-  // Cada título es un hipervínculo a su ficha. Va como un solo textParagraph con
-  // <a href> (Chat lo renderiza como link visible y clickeable) en vez de filas
-  // sueltas, que se ven clickeables recién al pasar el mouse.
-  const lineas = visibles.map(item => {
-    const emoji = item.tipo ? TIPO_TITULO[item.tipo]?.emoji ?? '•' : '•'
-    const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
-    return `${emoji} <a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
-  })
-
-  if (items.length > visibles.length) {
-    lineas.push(`<i>…y ${items.length - visibles.length} más en el sitio.</i>`)
+    ],
   }
 
-  widgets.push({ textParagraph: { text: lineas.join('<br>') } })
+  // Dos bloques: features para todos y desarrollos a medida (RAP), que suelen ser
+  // de un cliente puntual y se leen distinto. El orden de cada bloque se respeta.
+  const bloques = [
+    { titulo: '✨ Novedades', items: items.filter(i => i.tipo !== 'RAP') },
+    { titulo: '🛠️ Desarrollos a medida', items: items.filter(i => i.tipo === 'RAP') },
+  ].filter(b => b.items.length)
 
-  widgets.push({
-    buttonList: {
-      buttons: [
-        {
-          text: 'Ver todas',
-          onClick: { openLink: { url: `${base}/?disponibilidad=todos` } },
-        },
-      ],
-    },
+  // Tope por bloque, para que un bloque largo no esconda al otro.
+  const MAX = 15
+  const secciones = bloques.map(bloque => {
+    const visibles = bloque.items.slice(0, MAX)
+    // Cada título es un hipervínculo a su ficha. Va como un solo textParagraph con
+    // <a href> (Chat lo renderiza como link visible y clickeable) en vez de filas
+    // sueltas, que se ven clickeables recién al pasar el mouse.
+    const lineas = visibles.map(item => {
+      const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
+      return `• <a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
+    })
+    if (bloque.items.length > visibles.length) {
+      lineas.push(`<i>…y ${bloque.items.length - visibles.length} más en el sitio.</i>`)
+    }
+    return {
+      header: `${bloque.titulo} (${bloque.items.length})`,
+      widgets: [{ textParagraph: { text: lineas.join('<br>') } }],
+    }
   })
+
+  const boton = {
+    widgets: [
+      {
+        buttonList: {
+          buttons: [
+            {
+              text: 'Ver todas',
+              onClick: { openLink: { url: `${base}/?disponibilidad=todos` } },
+            },
+          ],
+        },
+      },
+    ],
+  }
 
   const card = {
     cardId: 'weekly-digest',
@@ -248,7 +263,7 @@ export async function postWeeklyDigest(
         title: `🟢 Ya disponibles para todos (${items.length})`,
         subtitle: `Semana del ${rango}`,
       },
-      sections: [{ widgets }],
+      sections: [intro, ...secciones, boton],
     },
   }
 
