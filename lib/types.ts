@@ -150,30 +150,36 @@ export function normalizeIssueType(raw: string | null | undefined): string | nul
 }
 
 /**
- * Tipos que NUNCA se avisan al canal de Google Chat: ni la card individual del
- * dia que salen, ni el resumen semanal del lunes. Se siguen publicando en el
- * sitio con normalidad — esto es una regla de canal, no de visibilidad.
+ * A que espacio de Google Chat va la card de cada tipo (oct 2026):
  *
- * `Bug Producto` (definicion de agosto 2026): son correcciones internas que el
- * equipo detecta y arregla. Son ~10-15 por semana, muchas mas que las features,
- * asi que al canal lo unico que le aportan es ruido: tapan las novedades reales
- * en un resumen que corta en 15 items. Quien las quiera ver, las tiene en el
- * sitio con su filtro de tipo.
+ * - `novedades`: el canal de siempre, el de las ~50 personas. Solo features:
+ *   Story y RAP (y cualquier tipo desconocido, que es lo menos sorpresivo).
+ * - `fixes`: el espacio `cliengo-bug-fix`. Todos los bugs, Cliente y Producto.
+ *
+ * Antes (ago 2026) Bug Producto no se avisaba en ningun lado porque tapaba las
+ * novedades reales; ahora tiene su propio espacio y vuelve a avisarse ahi. El
+ * resumen semanal del lunes sigue siendo solo de `novedades`: para un bug,
+ * IN PROD y ROLLED OUT significan lo mismo, no hay "termino su rollout".
  *
  * OJO: esto NO es lo mismo que `Difusion = No comunicar` en el board, que saca
  * al issue del sitio tambien.
  */
-const TIPOS_SIN_CHAT = ['bug producto']
+export type CanalChat = 'novedades' | 'fixes'
+
+const TIPOS_FIXES = ['bug cliente', 'bug producto']
 
 /**
  * Se compara normalizado (trim + lowercase) y no por igualdad exacta a proposito:
  * el issueType nativo llega con capitalizacion variable segun quien lo cargo, y
- * un match exacto apagaria la regla EN SILENCIO mandando bugs al canal de ~50
- * personas. Mismo criterio que `EXCLUDE_RULES` en sources/github.ts.
+ * un match exacto mandaria bugs EN SILENCIO al canal de ~50 personas. Mismo
+ * criterio que `EXCLUDE_RULES` en sources/github.ts.
  */
-export function avisaAlCanal(type: string | null | undefined): boolean {
-  if (!type) return true
-  return !TIPOS_SIN_CHAT.includes(type.trim().toLowerCase())
+export function esBug(type: string | null | undefined): boolean {
+  return !!type && TIPOS_FIXES.includes(type.trim().toLowerCase())
+}
+
+export function canalDe(type: string | null | undefined): CanalChat {
+  return esBug(type) ? 'fixes' : 'novedades'
 }
 
 export const ESTADO_LABELS: Record<EstadoDisponibilidad, string> = {

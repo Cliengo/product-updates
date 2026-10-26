@@ -1,8 +1,18 @@
 import {
   TIPO_LABELS,
   DISPONIBILIDAD_LABELS,
+  canalDe,
+  type CanalChat,
   type Disponibilidad,
 } from '@/lib/types'
+
+/**
+ * Webhook de cada espacio. Si falta el de `fixes`, los bugs no se avisan en
+ * ningun lado: NUNCA caen al webhook de `novedades`, que es el de ~50 personas.
+ */
+function webhookDe(canal: CanalChat): string | undefined {
+  return canal === 'fixes' ? process.env.CHAT_WEBHOOK_BUGS_URL : process.env.CHAT_WEBHOOK_URL
+}
 
 /**
  * Etiqueta compacta + emoji por tipo, para el TÍTULO de la card de Chat (donde
@@ -121,10 +131,14 @@ function buildCard(update: ChatUpdate): Record<string, unknown> {
  * bien; en ese caso solo perdemos la posibilidad de editarla.
  */
 async function postCards(
-  cards: Record<string, unknown>[]
+  cards: Record<string, unknown>[],
+  canal: CanalChat
 ): Promise<{ ok: boolean; name: string | null }> {
-  const webhook = process.env.CHAT_WEBHOOK_URL
-  if (!webhook) return { ok: false, name: null }
+  const webhook = webhookDe(canal)
+  if (!webhook) {
+    console.warn(`[chat] sin webhook para el canal ${canal}, no se postea`)
+    return { ok: false, name: null }
+  }
 
   try {
     const res = await fetch(webhook, {
@@ -145,7 +159,8 @@ async function postCards(
 }
 
 /**
- * Postea una novedad a un espacio de Google Chat (incoming webhook). El equipo
+ * Postea una novedad al espacio de Google Chat que le toca por tipo (ver
+ * `canalDe`): features al canal de novedades, bugs a `cliengo-bug-fix`. El equipo
  * que se une al espacio queda "suscripto". No hace nada si no hay webhook.
  * Nunca lanza: un fallo de Chat no debe romper el sync.
  *
@@ -153,7 +168,7 @@ async function postCards(
  * se ve en el sitio y se anuncia en el resumen semanal.
  */
 export async function postToChat(update: ChatUpdate): Promise<boolean> {
-  const { ok } = await postCards([buildCard(update)])
+  const { ok } = await postCards([buildCard(update)], canalDe(update.tipo))
   return ok
 }
 
@@ -232,6 +247,6 @@ export async function postWeeklyDigest(
     },
   }
 
-  const { ok } = await postCards([card])
+  const { ok } = await postCards([card], 'novedades')
   return { ok, posted: ok ? items.length : 0 }
 }
