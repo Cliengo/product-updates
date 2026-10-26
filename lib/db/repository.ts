@@ -184,6 +184,15 @@ export async function getRolledOutSince(since: Date): Promise<FeatureData[]> {
   return rows.map(r => deserialize(r))
 }
 
+/** Lo que llego a produccion desde `since`, por la fecha "En produccion" de la ficha. */
+export async function getInProdSince(since: Date): Promise<FeatureData[]> {
+  const rows = await prisma.feature.findMany({
+    where: { milestoneDate: { gte: since } },
+    orderBy: { milestoneDate: 'asc' },
+  })
+  return rows.map(r => deserialize(r))
+}
+
 export interface DeliveryRow {
   id: string
   issueNumber: number

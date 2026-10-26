@@ -8,11 +8,12 @@ import {
   getFeaturesMissingDescription,
   updateFeatureGenerated,
   getRolledOutSince,
+  getInProdSince,
 } from '@/lib/db/repository'
 import { MockDataSource } from './sources/mock'
 import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
-import { postToChat, postWeeklyDigest } from './chat'
+import { postToChat, postWeeklyDigest, postFixesDigest } from './chat'
 import { generateProductUpdate } from './groq'
 import { canalDe, canalManualDe, esBug } from '@/lib/types'
 
@@ -246,25 +247,39 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
   return { created, updated, deleted, notified, promoted, skipped, errors }
 }
 
+interface DigestResult {
+  found: number
+  posted: number
+  dry: boolean
+  items: string[]
+}
+
 /**
- * Resumen SEMANAL al canal: un único mensaje con todo lo que pasó a estar
- * disponible para todos en los últimos `days` días. Es el único aviso de este
- * cambio (las cards individuales se editan en silencio, y Chat no re-notifica
- * una edición). Si no hubo nada, no postea.
+ * Resumenes SEMANALES, uno por canal, en la misma corrida del lunes:
+ *
+ * - novedades: lo que paso a estar disponible para todos en los ultimos `days`
+ *   dias. Es el unico aviso de ese cambio (las cards no se editan).
+ * - fixes (`cliengo-bug-fix`): los Bug Cliente que llegaron a produccion en la
+ *   ventana. Para un bug no hay "termino su rollout", asi que se cuenta por la
+ *   fecha de produccion. Pensado para tenerlo a mano antes de la reunion de
+ *   bugs del lunes a la tarde.
+ *
+ * Un canal sin nada en la ventana no recibe mensaje.
  */
 export async function runWeeklyDigest(
   options: { days?: number; dry?: boolean } = {}
-): Promise<{ found: number; posted: number; dry: boolean; items: string[] }> {
+): Promise<DigestResult & { fixes: DigestResult }> {
   const days = options.days ?? 7
   const hasta = new Date()
   const desde = new Date(hasta.getTime() - days * 24 * 60 * 60 * 1000)
+  const dry = !!options.dry
 
   await ensureSchema()
-  // Segundo filtro, a proposito redundante con el de arriba: una feature que
+  // Segundo filtro, a proposito redundante con el de la promocion: una feature que
   // NACE ya en ROLLED OUT recibe `rolledOutAt` en createFeature (la fecha real de
   // produccion, no inventada), asi que nunca paso por el camino de promocion y
   // igual caeria en la ventana de 7 dias. Este es el que garantiza que ningun bug
-  // entre al resumen, que es solo del canal de novedades.
+  // entre al resumen de novedades.
   const features = (await getRolledOutSince(desde)).filter(f => canalDe(f.type) === 'novedades')
   const items = features.map(f => ({
     id: f.id,
@@ -274,12 +289,34 @@ export async function runWeeklyDigest(
     rolledOutAt: f.rolledOutAt,
   }))
 
-  if (options.dry) {
-    console.log(`[digest] dry-run: ${items.length} features en los últimos ${days} días`)
-    return { found: items.length, posted: 0, dry: true, items: items.map(i => i.titulo) }
+  const bugs = (await getInProdSince(desde)).filter(f => canalDe(f.type) === 'fixes')
+  const fixItems = bugs.map(f => ({
+    id: f.id,
+    titulo: f.tituloAmigable,
+    tipo: f.type,
+    producto: f.producto,
+  }))
+
+  const titulos = (l: { titulo: string }[]) => l.map(i => i.titulo)
+  if (dry) {
+    console.log(`[digest] dry-run: ${items.length} novedades, ${fixItems.length} fixes en ${days} días`)
+    return {
+      found: items.length,
+      posted: 0,
+      dry,
+      items: titulos(items),
+      fixes: { found: fixItems.length, posted: 0, dry, items: titulos(fixItems) },
+    }
   }
 
   const { posted } = await postWeeklyDigest(items, { desde, hasta })
-  console.log(`[digest] ${items.length} encontradas, ${posted} posteadas al canal`)
-  return { found: items.length, posted, dry: false, items: items.map(i => i.titulo) }
+  const fixes = await postFixesDigest(fixItems, { desde, hasta })
+  console.log(`[digest] novedades ${posted}/${items.length}, fixes ${fixes.posted}/${fixItems.length}`)
+  return {
+    found: items.length,
+    posted,
+    dry,
+    items: titulos(items),
+    fixes: { found: fixItems.length, posted: fixes.posted, dry, items: titulos(fixItems) },
+  }
 }

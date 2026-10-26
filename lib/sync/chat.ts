@@ -270,3 +270,56 @@ export async function postWeeklyDigest(
   const { ok } = await postCards([card], 'novedades')
   return { ok, posted: ok ? items.length : 0 }
 }
+
+/**
+ * Resumen semanal de `cliengo-bug-fix`: los Bug Cliente que llegaron a
+ * produccion en la semana, para tenerlos a mano antes de la reunion de bugs del
+ * lunes. No postea nada si la lista viene vacia.
+ */
+export async function postFixesDigest(
+  items: DigestItem[],
+  periodo: { desde: Date; hasta: Date }
+): Promise<{ ok: boolean; posted: number }> {
+  if (!items.length) return { ok: false, posted: 0 }
+
+  const base = appBase()
+  const rango = `${periodo.desde.toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short',
+  })} al ${periodo.hasta.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`
+
+  const MAX = 15
+  const visibles = items.slice(0, MAX)
+  const lineas = visibles.map(item => {
+    const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
+    return `• <a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
+  })
+  if (items.length > visibles.length) {
+    lineas.push(`<i>…y ${items.length - visibles.length} más en el sitio.</i>`)
+  }
+
+  const card = {
+    cardId: 'weekly-fixes-digest',
+    card: {
+      header: {
+        title: `🔧 Fixes de la semana (${items.length})`,
+        subtitle: `Bugs reportados por clientes que llegaron a producción · ${rango}`,
+      },
+      sections: [
+        { widgets: [{ textParagraph: { text: lineas.join('<br>') } }] },
+        {
+          widgets: [
+            {
+              buttonList: {
+                buttons: [{ text: 'Ver en el sitio', onClick: { openLink: { url: `${base}/?tipo=${encodeURIComponent('Bug Cliente')}` } } }],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  }
+
+  const { ok } = await postCards([card], 'fixes')
+  return { ok, posted: ok ? items.length : 0 }
+}

@@ -1,6 +1,8 @@
 name: Resumen semanal de rollouts
 
-# Un único mensaje al canal de Chat con las novedades que terminaron su rollout
+# Un mensaje al canal de novedades con lo que terminó su rollout, y otro a
+# cliengo-bug-fix con los Bug Cliente que llegaron a producción en la semana.
+# Novedades:
 # (pasaron de "en producción / parcial" a "disponible para todos") en la semana.
 # Las cards individuales se editan en silencio durante el sync horario; este
 # resumen es el único aviso activo de ese cambio.
