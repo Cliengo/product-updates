@@ -160,15 +160,20 @@ async function postCards(
 
 /**
  * Postea una novedad al espacio de Google Chat que le toca por tipo (ver
- * `canalDe`): features al canal de novedades, bugs a `cliengo-bug-fix`. El equipo
+ * `canalDe`): features al canal de novedades, Bug Cliente a `cliengo-bug-fix`,
+ * Bug Producto a ninguno salvo que se pase `canal` a mano. El equipo
  * que se une al espacio queda "suscripto". No hace nada si no hay webhook.
  * Nunca lanza: un fallo de Chat no debe romper el sync.
  *
  * La card no se edita después: cuando la feature termina su rollout, el cambio
  * se ve en el sitio y se anuncia en el resumen semanal.
  */
-export async function postToChat(update: ChatUpdate): Promise<boolean> {
-  const { ok } = await postCards([buildCard(update)], canalDe(update.tipo))
+export async function postToChat(
+  update: ChatUpdate,
+  canal: CanalChat | null = canalDe(update.tipo)
+): Promise<boolean> {
+  if (!canal) return false
+  const { ok } = await postCards([buildCard(update)], canal)
   return ok
 }
 

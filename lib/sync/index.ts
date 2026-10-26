@@ -14,7 +14,7 @@ import { GitHubDataSource } from './sources/github'
 import type { DataSource } from './sources/mock'
 import { postToChat, postWeeklyDigest } from './chat'
 import { generateProductUpdate } from './groq'
-import { canalDe, esBug } from '@/lib/types'
+import { canalDe, canalManualDe, esBug } from '@/lib/types'
 
 /**
  * Ventana de promocion silenciosa (one-time, agosto 2026).
@@ -99,8 +99,9 @@ export async function backfillDescriptions(issueNumber?: number): Promise<{
  * issue. Sirve para comunicar a mano una novedad puntual (ej. tras un backfill
  * silencioso donde el resto no se notificó).
  *
- * Va al mismo espacio que le tocaria solo (ver `canalDe`): un bug se reenvia a
- * `cliengo-bug-fix`, no al canal de novedades.
+ * A proposito NO respeta la regla de Bug Producto: es la valvula de escape
+ * manual. Si uno puntual amerita avisarse, sale en `cliengo-bug-fix` (ver
+ * `canalManualDe`); un bug nunca va al canal de novedades.
  */
 export async function notifyIssue(
   issueNumber: number
@@ -117,7 +118,7 @@ export async function notifyIssue(
     companyId: f.companyId,
     issueUrl: f.issueUrl,
     disponibilidad: f.disponibilidad,
-  })
+  }, canalManualDe(f.type))
   return { notified: ok }
 }
 

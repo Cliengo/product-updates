@@ -154,11 +154,12 @@ export function normalizeIssueType(raw: string | null | undefined): string | nul
  *
  * - `novedades`: el canal de siempre, el de las ~50 personas. Solo features:
  *   Story y RAP (y cualquier tipo desconocido, que es lo menos sorpresivo).
- * - `fixes`: el espacio `cliengo-bug-fix`. Todos los bugs, Cliente y Producto.
+ * - `fixes`: el espacio `cliengo-bug-fix`. Solo Bug Cliente.
+ * - ninguno (`null`): Bug Producto. Son ~10-15 por semana y abrumarian a
+ *   cualquier canal (definicion de ago 2026, ratificada al abrir `fixes`). Se
+ *   siguen publicando en el sitio; para avisar uno puntual esta `?notify=<nº>`.
  *
- * Antes (ago 2026) Bug Producto no se avisaba en ningun lado porque tapaba las
- * novedades reales; ahora tiene su propio espacio y vuelve a avisarse ahi. El
- * resumen semanal del lunes sigue siendo solo de `novedades`: para un bug,
+ * El resumen semanal del lunes es solo de `novedades`: para un bug,
  * IN PROD y ROLLED OUT significan lo mismo, no hay "termino su rollout".
  *
  * OJO: esto NO es lo mismo que `Difusion = No comunicar` en el board, que saca
@@ -167,6 +168,7 @@ export function normalizeIssueType(raw: string | null | undefined): string | nul
 export type CanalChat = 'novedades' | 'fixes'
 
 const TIPOS_FIXES = ['bug cliente', 'bug producto']
+const TIPOS_SIN_CHAT = ['bug producto']
 
 /**
  * Se compara normalizado (trim + lowercase) y no por igualdad exacta a proposito:
@@ -178,8 +180,15 @@ export function esBug(type: string | null | undefined): boolean {
   return !!type && TIPOS_FIXES.includes(type.trim().toLowerCase())
 }
 
-export function canalDe(type: string | null | undefined): CanalChat {
+/** Espacio de un tipo si se lo enviara a mano (`?notify`), aunque no se avise solo. */
+export function canalManualDe(type: string | null | undefined): CanalChat {
   return esBug(type) ? 'fixes' : 'novedades'
+}
+
+/** Espacio al que se avisa solo; `null` = no se avisa en ningun canal. */
+export function canalDe(type: string | null | undefined): CanalChat | null {
+  if (type && TIPOS_SIN_CHAT.includes(type.trim().toLowerCase())) return null
+  return canalManualDe(type)
 }
 
 export const ESTADO_LABELS: Record<EstadoDisponibilidad, string> = {
