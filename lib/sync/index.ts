@@ -287,6 +287,8 @@ export async function runWeeklyDigest(
     tipo: f.type,
     producto: f.producto,
     rolledOutAt: f.rolledOutAt,
+    issueNumber: f.issueNumber,
+    issueUrl: f.issueUrl,
   }))
 
   const bugs = (await getInProdSince(desde)).filter(f => canalDe(f.type) === 'fixes')

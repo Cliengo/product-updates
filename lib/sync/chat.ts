@@ -188,6 +188,18 @@ export interface DigestItem {
 }
 
 /**
+ * Numero del issue al inicio de cada linea de los resumenes, linkeado a GitHub:
+ * es como se nombran los items en las reuniones. El titulo sigue llevando a la
+ * ficha del sitio.
+ */
+function numeroIssue(item: DigestItem): string {
+  if (!item.issueNumber) return ''
+  return item.issueUrl
+    ? `<a href="${item.issueUrl}">#${item.issueNumber}</a> `
+    : `#${item.issueNumber} `
+}
+
+/**
  * Resumen semanal: UN solo mensaje al canal con todo lo que terminó su rollout
  * en la semana. Es el único aviso de este cambio (las cards individuales se
  * editan en silencio). No postea nada si la lista viene vacía.
@@ -232,7 +244,7 @@ export async function postWeeklyDigest(
     // sueltas, que se ven clickeables recién al pasar el mouse.
     const lineas = visibles.map(item => {
       const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
-      return `• <a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
+      return `• ${numeroIssue(item)}<a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
     })
     if (bloque.items.length > visibles.length) {
       lineas.push(`<i>…y ${bloque.items.length - visibles.length} más en el sitio.</i>`)
@@ -294,14 +306,7 @@ export async function postFixesDigest(
   const visibles = items.slice(0, MAX)
   const lineas = visibles.map(item => {
     const producto = item.producto ? ` · ${escapeHtml(item.producto)}` : ''
-    // El numero del issue va adelante y lleva a GitHub: es como se nombran los
-    // bugs en la reunion. El titulo sigue llevando a la ficha del sitio.
-    const numero = item.issueNumber
-      ? item.issueUrl
-        ? `<a href="${item.issueUrl}">#${item.issueNumber}</a> `
-        : `#${item.issueNumber} `
-      : ''
-    return `• ${numero}<a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
+    return `• ${numeroIssue(item)}<a href="${base}/features/${item.id}">${escapeHtml(item.titulo)}</a>${producto}`
   })
   if (items.length > visibles.length) {
     lineas.push(`<i>…y ${items.length - visibles.length} más en el sitio.</i>`)
