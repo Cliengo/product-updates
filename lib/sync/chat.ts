@@ -47,6 +47,7 @@ export interface ChatUpdate {
   producto?: string | null
   fecha?: string | null
   companyId?: string | null
+  issueNumber?: number | null
   issueUrl?: string | null
   disponibilidad?: Disponibilidad | null
 }
@@ -84,9 +85,12 @@ function buildCard(update: ChatUpdate): Record<string, unknown> {
   // El tipo va en el TÍTULO (se lee más grande); el subtítulo queda para el producto.
   const tipoTitulo = update.tipo ? TIPO_TITULO[update.tipo] : null
   const emoji = tipoTitulo?.emoji ?? '📣'
+  // El numero del issue va en el titulo, igual que en los resumenes del lunes. El
+  // header de la card es texto plano (no admite <a>): el link a GitHub es el boton.
+  const numero = update.issueNumber ? ` #${update.issueNumber}` : ''
   const title = tipoTitulo
-    ? `${emoji} ${tipoTitulo.label}: ${update.titulo}`
-    : `${emoji} ${update.titulo}`
+    ? `${emoji} ${tipoTitulo.label}${numero}: ${update.titulo}`
+    : `${emoji}${numero ? `${numero}:` : ''} ${update.titulo}`
   const subtitle = update.producto || (update.tipo ? TIPO_LABELS[update.tipo] ?? update.tipo : null)
   const fecha = formatDate(update.fecha)
 

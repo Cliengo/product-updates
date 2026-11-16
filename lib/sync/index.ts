@@ -117,6 +117,7 @@ export async function notifyIssue(
     producto: f.producto,
     fecha: f.milestoneDate,
     companyId: f.companyId,
+    issueNumber: f.issueNumber,
     issueUrl: f.issueUrl,
     disponibilidad: f.disponibilidad,
   }, canalManualDe(f.type))
@@ -174,6 +175,7 @@ export async function runSync(options: { reset?: boolean; silent?: boolean } = {
             producto: item.data.producto,
             fecha: item.data.milestoneDate,
             companyId: item.data.companyId,
+            issueNumber: item.data.issueNumber,
             issueUrl: item.data.issueUrl,
             disponibilidad: item.data.disponibilidad,
           })
